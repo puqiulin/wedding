@@ -3,6 +3,12 @@
 import Image, { ImageLoaderProps } from "next/image";
 import { useState, useCallback, useEffect, useRef } from "react";
 import type { Photo } from "@/lib/db/schema";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const seaweedLoader = ({ src }: ImageLoaderProps) =>
   `${process.env.NEXT_PUBLIC_S3_BASE}/${src}`;
@@ -12,7 +18,6 @@ export default function AlbumClient({ photos, bgmSrc }: { photos: Photo[]; bgmSr
   const [playing, setPlaying] = useState(true);
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  // Browsers block autoplay — start on first user interaction
   useEffect(() => {
     if (!bgmSrc) return;
     const tryPlay = () => {
@@ -27,7 +32,6 @@ export default function AlbumClient({ photos, bgmSrc }: { photos: Photo[]; bgmSr
     };
   }, [bgmSrc]);
 
-  const close = useCallback(() => setLightboxIndex(null), []);
   const prev = useCallback(
     () => setLightboxIndex((i) => (i !== null ? (i - 1 + photos.length) % photos.length : null)),
     [photos.length]
@@ -40,22 +44,17 @@ export default function AlbumClient({ photos, bgmSrc }: { photos: Photo[]; bgmSr
   useEffect(() => {
     if (lightboxIndex === null) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
       if (e.key === "ArrowLeft") prev();
       if (e.key === "ArrowRight") next();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [lightboxIndex, close, prev, next]);
+  }, [lightboxIndex, prev, next]);
 
   function toggleBgm() {
     const audio = audioRef.current;
     if (!audio) return;
-    if (playing) {
-      audio.pause();
-    } else {
-      audio.play();
-    }
+    if (playing) { audio.pause(); } else { audio.play(); }
     setPlaying(!playing);
   }
 
@@ -64,13 +63,15 @@ export default function AlbumClient({ photos, bgmSrc }: { photos: Photo[]; bgmSr
       {bgmSrc && (
         <>
           <audio ref={audioRef} src={`${process.env.NEXT_PUBLIC_S3_BASE}/${bgmSrc}`} loop />
-          <button
+          <Button
             onClick={toggleBgm}
-            className="fixed bottom-6 right-6 z-40 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur hover:bg-black/70 transition-colors"
+            size="icon"
+            variant="secondary"
+            className="fixed bottom-6 right-6 z-40 rounded-full bg-black/50 text-white backdrop-blur hover:bg-black/70"
             aria-label={playing ? "暂停音乐" : "播放音乐"}
           >
             {playing ? "\u23F8" : "\u25B6"}
-          </button>
+          </Button>
         </>
       )}
       <main>
@@ -94,33 +95,43 @@ export default function AlbumClient({ photos, bgmSrc }: { photos: Photo[]; bgmSr
           ))}
         </div>
       </main>
-      {lightboxIndex !== null && (
-        <div
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
-          onClick={close}
-        >
-          <button onClick={(e) => { e.stopPropagation(); prev(); }} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white text-4xl p-2">
-            &#8249;
-          </button>
-          <div className="relative max-w-[90vw] max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-            <Image
-              loader={seaweedLoader}
-              src={photos[lightboxIndex].src}
-              alt={photos[lightboxIndex].alt}
-              width={1200}
-              height={1600}
-              className="max-w-full max-h-[90vh] object-contain"
-              priority
-            />
-          </div>
-          <button onClick={(e) => { e.stopPropagation(); next(); }} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white text-4xl p-2">
-            &#8250;
-          </button>
-          <button onClick={close} className="absolute top-4 right-4 text-white/70 hover:text-white text-2xl p-2">
-            &times;
-          </button>
-        </div>
-      )}
+
+      <Dialog open={lightboxIndex !== null} onOpenChange={(open) => { if (!open) setLightboxIndex(null); }}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 border-none bg-black/95 flex items-center justify-center [&>button]:text-white [&>button]:hover:text-white/80">
+          <DialogTitle className="sr-only">照片预览</DialogTitle>
+          {lightboxIndex !== null && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={prev}
+                className="absolute left-2 top-1/2 -translate-y-1/2 text-white/70 hover:text-white hover:bg-white/10 text-3xl z-10"
+              >
+                &#8249;
+              </Button>
+              <div className="relative max-w-[90vw] max-h-[90vh]">
+                <Image
+                  loader={seaweedLoader}
+                  src={photos[lightboxIndex].src}
+                  alt={photos[lightboxIndex].alt}
+                  width={1200}
+                  height={1600}
+                  className="max-w-full max-h-[90vh] object-contain"
+                  priority
+                />
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={next}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-white/70 hover:text-white hover:bg-white/10 text-3xl z-10"
+              >
+                &#8250;
+              </Button>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

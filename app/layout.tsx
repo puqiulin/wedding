@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   description: "诚挚邀请您参加我们的婚礼",
   openGraph: {
     title: "我们结婚啦",
-    description: "诚挚邀请您参加我们的婚礼",
+    description: "何星朋🩷王培琳",
     type: "website",
     images: [
       {

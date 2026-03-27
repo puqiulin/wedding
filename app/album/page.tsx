@@ -10,13 +10,16 @@ export default async function AlbumPage() {
   const bgmSrc = musicRows[0]?.src ?? undefined;
 
   return (
-    <div className="min-h-screen bg-white">
-      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-100 px-4 py-3">
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur border-b px-4 py-3">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <Link href="/" className="text-sm text-gray-500 hover:text-gray-800 transition-colors">
-            返回首页
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center rounded-lg px-2.5 h-7 text-[0.8rem] font-medium hover:bg-muted hover:text-foreground transition-all"
+          >
+            ←
           </Link>
-          <h1 className="text-lg font-medium text-gray-800">xxx</h1>
+          {/* <h1 className="text-lg font-medium">sprite</h1> */}
           <div className="w-16" />
         </div>
       </header>
