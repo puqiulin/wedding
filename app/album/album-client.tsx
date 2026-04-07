@@ -2,6 +2,7 @@
 
 import Image, { ImageLoaderProps } from "next/image";
 import { useState, useCallback, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import type { Photo } from "@/lib/db/schema";
 import { Button } from "@/components/ui/button";
 import {
@@ -77,8 +78,12 @@ export default function AlbumClient({ photos, bgmSrc }: { photos: Photo[]; bgmSr
       <main>
         <div className="grid grid-cols-1">
           {photos.map((photo, i) => (
-            <button
+            <motion.button
               key={photo.id}
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.6, delay: i < 3 ? i * 0.15 : 0, ease: "easeOut" }}
               onClick={() => setLightboxIndex(i)}
               className="block w-full overflow-hidden hover:opacity-90 transition-opacity cursor-zoom-in"
             >
@@ -91,7 +96,7 @@ export default function AlbumClient({ photos, bgmSrc }: { photos: Photo[]; bgmSr
                 className="w-full h-full object-cover block"
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
               />
-            </button>
+            </motion.button>
           ))}
         </div>
       </main>
@@ -110,15 +115,25 @@ export default function AlbumClient({ photos, bgmSrc }: { photos: Photo[]; bgmSr
                 &#8249;
               </Button>
               <div className="relative max-w-[90vw] max-h-[90vh]">
-                <Image
-                  loader={seaweedLoader}
-                  src={photos[lightboxIndex].src}
-                  alt={photos[lightboxIndex].alt}
-                  width={1200}
-                  height={1600}
-                  className="max-w-full max-h-[90vh] object-contain"
-                  priority
-                />
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={lightboxIndex}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.25, ease: "easeOut" }}
+                  >
+                    <Image
+                      loader={seaweedLoader}
+                      src={photos[lightboxIndex].src}
+                      alt={photos[lightboxIndex].alt}
+                      width={1200}
+                      height={1600}
+                      className="max-w-full max-h-[90vh] object-contain"
+                      priority
+                    />
+                  </motion.div>
+                </AnimatePresence>
               </div>
               <Button
                 variant="ghost"

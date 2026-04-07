@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
 import { db } from "@/lib/db";
 import { photos, music } from "@/lib/db/schema";
 import { asc } from "drizzle-orm";
@@ -17,7 +18,7 @@ export default async function AlbumPage() {
             href="/"
             className="inline-flex items-center justify-center rounded-lg px-2.5 h-7 text-[0.8rem] font-medium hover:bg-muted hover:text-foreground transition-all"
           >
-            ←
+            <ChevronLeft className="size-4" />
           </Link>
           {/* <h1 className="text-lg font-medium">sprite</h1> */}
           <div className="w-16" />

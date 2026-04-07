@@ -156,6 +156,7 @@ export default function AdminPage() {
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
   const [musicFile, setMusicFile] = useState<MusicType | null>(null);
   const [musicProgress, setMusicProgress] = useState<number | null>(null);
+  const [deletingMusic, setDeletingMusic] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const sensors = useSensors(
@@ -228,8 +229,13 @@ export default function AdminPage() {
   }
 
   async function deleteMusic() {
-    await fetch("/api/music", { method: "DELETE" });
-    setMusicFile(null);
+    setDeletingMusic(true);
+    try {
+      await fetch("/api/music", { method: "DELETE" });
+      setMusicFile(null);
+    } finally {
+      setDeletingMusic(false);
+    }
   }
 
   async function deletePhoto(id: number) {
@@ -282,11 +288,14 @@ export default function AdminPage() {
                 背景音乐
               </div>
               {musicFile ? (
-                <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
+                <div className={cn("flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2", deletingMusic && "opacity-50 pointer-events-none")}>
                   <div className="min-w-0">
                     <p className="text-sm truncate">{musicFile.fileName}</p>
                     <p className="text-xs text-muted-foreground">{fmt(musicFile.fileSize)}</p>
                   </div>
+                  {deletingMusic ? (
+                    <Loader2 className="size-4 animate-spin text-muted-foreground shrink-0" />
+                  ) : (
                   <AlertDialog>
                     <AlertDialogTrigger render={<Button variant="ghost" size="icon-sm" />}>
                       <Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
@@ -302,6 +311,7 @@ export default function AdminPage() {
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
+                  )}
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">未设置</p>

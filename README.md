@@ -1,4 +1,4 @@
-# SeaweedFS bucket policy
+# Setup SeaweedFS bucket policy
 ```shell
 aws s3api put-bucket-policy --endpoint-url http://localhost:8333 --bucket wedding --policy '{
   "Version": "2012-10-17",
