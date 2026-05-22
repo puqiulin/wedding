@@ -4,4 +4,4 @@ dev:
 
 .PHONY: migrate
 migrate:
-	bun run db:migrate
+	bun run db:migrate 
