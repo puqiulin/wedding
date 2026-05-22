@@ -13,9 +13,10 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   ImagePlus, Music, Trash2, LogOut, RefreshCw, Upload, X,
-  CheckCircle2, AlertCircle, Loader2,
+  CheckCircle2, AlertCircle, Loader2, Globe2, Flag, Monitor, Smartphone,
+  Chrome,
 } from "lucide-react";
-import type { Photo, Music as MusicType } from "@/lib/db/schema";
+import type { Photo, Music as MusicType, VisitorLog } from "@/lib/db/schema";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,6 +34,16 @@ const fmt = (bytes: number) => {
   const u = ["B", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   return `${(bytes / 1024 ** i).toFixed(i ? 1 : 0)} ${u[i]}`;
+};
+
+const dash = (value: string | number | null | undefined) =>
+  value === null || value === undefined || value === "" ? "—" : value;
+
+const pad = (value: number) => value.toString().padStart(2, "0");
+
+const fmtDate = (value: string | Date) => {
+  const d = new Date(value);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 };
 
 const s3 = ({ src }: ImageLoaderProps) =>
@@ -58,6 +69,8 @@ interface UploadItem {
   progress: number;
   status: "uploading" | "done" | "error";
 }
+
+type VisitorLogRow = Omit<VisitorLog, "createdAt"> & { createdAt: string };
 
 // --- Upload Progress Panel ---
 
@@ -97,6 +110,125 @@ function UploadProgress({ items }: { items: UploadItem[] }) {
         ))}
       </div>
     </div>
+  );
+}
+
+// --- Visitor Table ---
+
+function VisitorTable({ visits }: { visits: VisitorLogRow[] }) {
+  const flagText = (visit: VisitorLogRow) =>
+    [
+      visit.isAnonymous && "匿名",
+      visit.isAnonymousVpn && "VPN",
+      visit.isHostingProvider && "托管",
+      visit.isPublicProxy && "代理",
+      visit.isTorExitNode && "Tor",
+    ].filter(Boolean).join(" / ");
+
+  const tableIconClass = "size-3.5 shrink-0 text-muted-foreground";
+
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-0">
+        <div className="flex items-center justify-between border-b px-4 py-3">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Globe2 className="size-4 text-muted-foreground" />
+            访客信息
+          </div>
+          <span className="text-xs text-muted-foreground">最近 {visits.length} 条</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1080px] text-left text-sm">
+            <thead className="bg-muted/50 text-xs text-muted-foreground">
+              <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:font-medium">
+                <th>时间</th>
+                <th>IP</th>
+                <th>
+                  <span className="flex items-center gap-1.5">
+                    <Flag className={tableIconClass} />
+                    国家
+                  </span>
+                </th>
+                <th>ASN</th>
+                <th>
+                  <span className="flex items-center gap-1.5">
+                    <Monitor className={tableIconClass} />
+                    系统
+                  </span>
+                </th>
+                <th>
+                  <span className="flex items-center gap-1.5">
+                    <Chrome className={tableIconClass} />
+                    浏览器
+                  </span>
+                </th>
+                <th>
+                  <span className="flex items-center gap-1.5">
+                    <Smartphone className={tableIconClass} />
+                    设备
+                  </span>
+                </th>
+                <th>风险</th>
+                <th>路径</th>
+                <th>User-Agent</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visits.map((visit) => (
+                <tr key={visit.id} className="border-t align-top [&>td]:px-3 [&>td]:py-2">
+                  <td className="whitespace-nowrap text-muted-foreground">{fmtDate(visit.createdAt)}</td>
+                  <td className="whitespace-nowrap font-mono text-xs">{dash(visit.ip)}</td>
+                  <td className="whitespace-nowrap">
+                    <span className="flex items-center gap-1.5">
+                      <Flag className={tableIconClass} />
+                      <span>
+                        {dash(visit.countryName)}
+                        {visit.countryCode && <span className="ml-1 text-muted-foreground">({visit.countryCode})</span>}
+                      </span>
+                    </span>
+                  </td>
+                  <td className="max-w-[180px]">
+                    <div className="truncate">{dash(visit.autonomousSystemOrganization)}</div>
+                    {visit.autonomousSystemNumber && (
+                      <div className="text-xs text-muted-foreground">AS{visit.autonomousSystemNumber}</div>
+                    )}
+                  </td>
+                  <td className="whitespace-nowrap">
+                    <span className="flex items-center gap-1.5">
+                      <Monitor className={tableIconClass} />
+                      {dash([visit.osName, visit.osVersion].filter(Boolean).join(" "))}
+                    </span>
+                  </td>
+                  <td className="whitespace-nowrap">
+                    <span className="flex items-center gap-1.5">
+                      <Chrome className={tableIconClass} />
+                      {dash([visit.browserName, visit.browserVersion].filter(Boolean).join(" "))}
+                    </span>
+                  </td>
+                  <td className="max-w-[160px]">
+                    <div className="flex items-start gap-1.5">
+                      <Smartphone className={cn(tableIconClass, "mt-0.5")} />
+                      <div className="min-w-0">
+                        <div className="truncate">{dash([visit.deviceVendor, visit.deviceModel].filter(Boolean).join(" "))}</div>
+                        <div className="text-xs text-muted-foreground">{dash(visit.deviceType)}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="whitespace-nowrap text-xs">{dash(flagText(visit))}</td>
+                  <td className="max-w-[180px] truncate" title={visit.path}>{dash(visit.path)}</td>
+                  <td className="max-w-[280px] truncate text-xs text-muted-foreground" title={visit.userAgent}>
+                    {dash(visit.userAgent)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {!visits.length && (
+          <div className="py-10 text-center text-sm text-muted-foreground">暂无访客记录</div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -155,6 +287,7 @@ export default function AdminPage() {
   const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set());
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
   const [musicFile, setMusicFile] = useState<MusicType | null>(null);
+  const [visits, setVisits] = useState<VisitorLogRow[]>([]);
   const [musicProgress, setMusicProgress] = useState<number | null>(null);
   const [deletingMusic, setDeletingMusic] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -168,7 +301,13 @@ export default function AdminPage() {
     setPhotos(await fetch("/api/photos").then((r) => r.json()));
   }, []);
 
+  const fetchVisits = useCallback(async () => {
+    const res = await fetch("/api/visits");
+    if (res.ok) setVisits(await res.json());
+  }, []);
+
   useEffect(() => { fetchPhotos(); }, [fetchPhotos]);
+  useEffect(() => { fetchVisits(); }, [fetchVisits]);
   useEffect(() => { fetch("/api/music").then((r) => r.json()).then(setMusicFile); }, []);
 
   async function uploadFile(file: File, folder?: string) {
@@ -267,7 +406,7 @@ export default function AdminPage() {
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
           <h1 className="text-lg font-semibold tracking-tight">相册管理</h1>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon-sm" onClick={fetchPhotos} aria-label="刷新">
+            <Button variant="ghost" size="icon-sm" onClick={() => { fetchPhotos(); fetchVisits(); }} aria-label="刷新">
               <RefreshCw className="size-4" />
             </Button>
             <Button variant="ghost" size="sm" onClick={() => { fetch("/api/auth/logout", { method: "POST" }); router.push("/admin/login"); }}>
@@ -378,6 +517,8 @@ export default function AdminPage() {
             </div>
           )}
         </div>
+
+        <VisitorTable visits={visits} />
       </main>
     </div>
   );

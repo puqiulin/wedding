@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
+import { VisitorTracker } from "./visitor-tracker";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -31,6 +33,9 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" className={cn("font-sans", geist.variable)}>
       <body className="antialiased">
+        <Suspense fallback={null}>
+          <VisitorTracker />
+        </Suspense>
         {children}
       </body>
     </html>
