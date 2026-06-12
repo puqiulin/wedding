@@ -1,94 +1,31 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
-import Link from "next/link";
-import { CalendarDays, Camera, ExternalLink, Heart, MapPin } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
+import Image, { ImageLoaderProps } from "next/image";
+import { Heart } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import type { GalleryPhoto } from "@/lib/invitation-data";
+import { weddingEvents, type WeddingEvent } from "@/lib/venues";
+import { VenueInfo } from "./venue-info";
 
-const weddingEvents = [
-  {
-    date: "2026.9.28",
-    isoDate: "2026-09-28",
-    city: "成都",
-    address: "成都市双流区广都大道480号",
-    position: [103.932975, 30.551881] as const,
-  },
-  {
-    date: "2026.10.5",
-    isoDate: "2026-10-05",
-    city: "巴中",
-    address: "巴中市巴州区回风北路55号宏鼎国际2号楼",
-    position: [106.736883, 31.869566] as const,
-  },
-];
+const seaweedLoader = ({ src }: ImageLoaderProps) =>
+  `${process.env.NEXT_PUBLIC_S3_BASE}/${src}`;
 
-type WeddingEvent = (typeof weddingEvents)[number];
-
-type AMapPosition = readonly [number, number];
-
-type AMapMarker = {
-  on: (eventName: string, handler: () => void) => void;
-  setMap: (map: AMapMap) => void;
-};
-
-type AMapMap = {
-  destroy: () => void;
-  setFitView: (overlays: AMapMarker[], immediately?: boolean, avoid?: [number, number, number, number]) => void;
-  setZoomAndCenter: (zoom: number, center: AMapPosition) => void;
-};
-
-type AMapNamespace = {
-  Map: new (container: HTMLElement, options: Record<string, unknown>) => AMapMap;
-  Marker: new (options: Record<string, unknown>) => AMapMarker;
-  Pixel: new (x: number, y: number) => unknown;
-};
-
-declare global {
-  interface Window {
-    AMap?: AMapNamespace;
-    _AMapSecurityConfig?: {
-      securityJsCode?: string;
-    };
-  }
-}
-
-let amapLoaderPromise: Promise<AMapNamespace> | null = null;
-
-function loadAmap(key: string) {
-  if (window.AMap) return Promise.resolve(window.AMap);
-  if (amapLoaderPromise) return amapLoaderPromise;
-
-  amapLoaderPromise = new Promise<AMapNamespace>((resolve, reject) => {
-    const securityJsCode = process.env.NEXT_PUBLIC_AMAP_SECURITY_JS_CODE;
-    if (securityJsCode) {
-      window._AMapSecurityConfig = { securityJsCode };
-    }
-
-    const script = document.createElement("script");
-    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(key)}`;
-    script.async = true;
-    script.onload = () => {
-      if (window.AMap) {
-        resolve(window.AMap);
-      } else {
-        reject(new Error("高德地图脚本已加载，但 AMap 对象不可用"));
-      }
-    };
-    script.onerror = () => reject(new Error("高德地图脚本加载失败"));
-    document.head.appendChild(script);
-  });
-
-  return amapLoaderPromise;
-}
-
-function getAmapNavigationUrl(event: WeddingEvent) {
-  const [lng, lat] = event.position;
-  const name = encodeURIComponent(`${event.city}婚礼地点 ${event.address}`);
-  return `https://uri.amap.com/marker?position=${lng},${lat}&name=${name}&coordinate=gaode&callnative=1`;
-}
-
-export default function HomeClient() {
+export default function HomeClient({
+  photos,
+  bgmSrc,
+  venueEvents = weddingEvents,
+}: {
+  photos: GalleryPhoto[];
+  bgmSrc?: string;
+  venueEvents?: readonly WeddingEvent[];
+}) {
   const [opened, setOpened] = useState(false);
   const [coverHidden, setCoverHidden] = useState(false);
   const reduceMotion = useReducedMotion();
@@ -130,34 +67,15 @@ export default function HomeClient() {
           <p className="text-base text-[#6b3a32] sm:text-lg">何星朋 &amp; 王培琳</p>
         </div>
 
-        <div className="grid w-full max-w-md gap-3 text-left">
-          {weddingEvents.map((event) => (
-            <div
-              key={event.date}
-              className="rounded-lg border border-[#d9aaa0]/55 bg-white/58 px-4 py-3 shadow-[0_12px_34px_rgba(138,27,21,0.08)] backdrop-blur"
-            >
-              <p className="flex items-center gap-2 text-sm font-semibold text-[#9f101a]">
-                <CalendarDays className="size-4" />
-                <time dateTime={event.isoDate}>{event.date}</time>
-              </p>
-              <p className="mt-2 flex items-start gap-2 text-sm leading-6 text-[#6b3a32]">
-                <MapPin className="mt-1 size-4 shrink-0 text-[#b9232d]" />
-                <span>{event.address}</span>
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <VenueMap />
-
-        <Link
-          href="/album"
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#9f101a] px-5 text-sm font-medium text-white shadow-[0_12px_28px_rgba(159,16,26,0.22)] transition-all hover:-translate-y-0.5 hover:bg-[#7f0b13] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#c31b28]/30"
-        >
-          <Camera className="size-4" />
-          查看相册
-        </Link>
+        <p className="max-w-xs text-sm leading-6 text-[#8a554d]">请下滑查看相册与婚礼地点</p>
       </motion.section>
+
+      {opened && (
+        <>
+          <AlbumGallery photos={photos} bgmSrc={bgmSrc} />
+          <VenueInfo events={venueEvents} />
+        </>
+      )}
 
       {!coverHidden && (
         <motion.div
@@ -240,121 +158,142 @@ export default function HomeClient() {
   );
 }
 
-function VenueMap() {
-  const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<AMapMap | null>(null);
-  const amapKey = process.env.NEXT_PUBLIC_AMAP_KEY ?? "";
-  const [selectedDate, setSelectedDate] = useState(weddingEvents[0].date);
-  const [mapError, setMapError] = useState<string | null>(() =>
-    amapKey ? null : "缺少 NEXT_PUBLIC_AMAP_KEY"
-  );
+function AlbumGallery({ photos, bgmSrc }: { photos: GalleryPhoto[]; bgmSrc?: string }) {
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [playing, setPlaying] = useState(true);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
-    const container = mapContainerRef.current;
-    if (!container) return;
-    if (!amapKey) return;
-
-    let disposed = false;
-    loadAmap(amapKey)
-      .then((AMap) => {
-        if (disposed || !mapContainerRef.current) return;
-
-        const map = new AMap.Map(mapContainerRef.current, {
-          center: [105.336, 31.21],
-          zoom: 7,
-          resizeEnable: true,
-          viewMode: "2D",
-        });
-
-        const markers = weddingEvents.map((event, index) => {
-          const marker = new AMap.Marker({
-            position: event.position,
-            title: event.address,
-            offset: new AMap.Pixel(-14, -34),
-            content: `<div style="width:28px;height:34px;border-radius:16px 16px 16px 4px;transform:rotate(-45deg);background:#a80f1a;box-shadow:0 10px 24px rgba(128,11,19,.32);border:2px solid #fff4df;display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);color:#fff4df;font-size:13px;font-weight:700;">${index + 1}</span></div>`,
-          });
-          marker.setMap(map);
-          marker.on("click", () => setSelectedDate(event.date));
-          return marker;
-        });
-
-        map.setFitView(markers, false, [56, 28, 56, 28]);
-        mapInstanceRef.current = map;
-      })
-      .catch((error: unknown) => {
-        setMapError(error instanceof Error ? error.message : "高德地图加载失败");
-      });
-
-    return () => {
-      disposed = true;
-      mapInstanceRef.current?.destroy();
-      mapInstanceRef.current = null;
+    if (!bgmSrc) return;
+    const tryPlay = () => {
+      audioRef.current?.play().then(() => setPlaying(true)).catch(() => {});
     };
-  }, [amapKey]);
+    tryPlay();
+    document.addEventListener("click", tryPlay, { once: true });
+    document.addEventListener("touchstart", tryPlay, { once: true });
+    return () => {
+      document.removeEventListener("click", tryPlay);
+      document.removeEventListener("touchstart", tryPlay);
+    };
+  }, [bgmSrc]);
 
-  function focusVenue(event: WeddingEvent) {
-    setSelectedDate(event.date);
-    mapInstanceRef.current?.setZoomAndCenter(15, event.position);
+  const prev = () =>
+    setLightboxIndex((index) => (index !== null ? (index - 1 + photos.length) % photos.length : null));
+  const next = () =>
+    setLightboxIndex((index) => (index !== null ? (index + 1) % photos.length : null));
+
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "ArrowLeft") prev();
+      if (event.key === "ArrowRight") next();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  function toggleBgm() {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (playing) {
+      audio.pause();
+    } else {
+      audio.play();
+    }
+    setPlaying(!playing);
   }
 
   return (
-    <section className="w-full max-w-md rounded-lg border border-[#d9aaa0]/55 bg-white/62 p-3 text-left shadow-[0_16px_42px_rgba(138,27,21,0.1)] backdrop-blur">
-      <div className="mb-3 flex items-center justify-between gap-3 px-1">
-        <p className="flex items-center gap-2 text-sm font-semibold text-[#9f101a]">
-          <MapPin className="size-4" />
-          婚礼地图
-        </p>
-        <span className="text-xs text-[#8c5a52]">高德地图</span>
+    <section className="relative bg-white">
+      {bgmSrc && (
+        <>
+          <audio ref={audioRef} src={`${process.env.NEXT_PUBLIC_S3_BASE}/${bgmSrc}`} loop />
+          <Button
+            onClick={toggleBgm}
+            size="icon"
+            variant="secondary"
+            className="fixed bottom-6 right-6 z-40 rounded-full bg-black/50 text-white backdrop-blur hover:bg-black/70"
+            aria-label={playing ? "暂停音乐" : "播放音乐"}
+          >
+            {playing ? "\u23F8" : "\u25B6"}
+          </Button>
+        </>
+      )}
+
+      <div className="grid grid-cols-1">
+        {photos.map((photo, index) => (
+          <motion.button
+            key={photo.id}
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-50px" }}
+            transition={{ duration: 0.6, delay: index < 3 ? index * 0.15 : 0, ease: "easeOut" }}
+            onClick={() => setLightboxIndex(index)}
+            className="block w-full cursor-zoom-in overflow-hidden transition-opacity hover:opacity-90"
+          >
+            <Image
+              loader={seaweedLoader}
+              src={photo.src}
+              alt={photo.alt}
+              width={600}
+              height={600}
+              className="block h-full w-full object-cover"
+              sizes="100vw"
+            />
+          </motion.button>
+        ))}
       </div>
 
-      <div
-        ref={mapContainerRef}
-        className="h-56 w-full overflow-hidden rounded-lg bg-[#f2d9d2] ring-1 ring-[#d9aaa0]/50"
-        aria-label="婚礼地点地图"
-      />
+      {!photos.length && (
+        <div className="px-6 py-20 text-center text-sm text-[#8a554d]">暂无相册照片</div>
+      )}
 
-      {mapError && <p className="mt-2 text-xs leading-5 text-[#9f101a]">{mapError}</p>}
-
-      <div className="mt-3 grid gap-2">
-        {weddingEvents.map((event) => {
-          const selected = selectedDate === event.date;
-          return (
-            <div
-              key={event.date}
-              className="grid gap-2 rounded-md border border-[#d9aaa0]/50 bg-[#fff8f4]/72 p-3 sm:grid-cols-[1fr_auto] sm:items-center"
-            >
-              <button
-                type="button"
-                onClick={() => focusVenue(event)}
-                className="min-w-0 text-left outline-none focus-visible:ring-3 focus-visible:ring-[#c31b28]/25"
-                aria-pressed={selected}
+      <Dialog open={lightboxIndex !== null} onOpenChange={(open) => { if (!open) setLightboxIndex(null); }}>
+        <DialogContent className="max-h-[95vh] max-w-[95vw] border-none bg-black/95 p-0 flex items-center justify-center [&>button]:text-white [&>button]:hover:text-white/80">
+          <DialogTitle className="sr-only">照片预览</DialogTitle>
+          {lightboxIndex !== null && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={prev}
+                className="absolute left-2 top-1/2 z-10 -translate-y-1/2 text-3xl text-white/70 hover:bg-white/10 hover:text-white"
               >
-                <span className="flex items-center gap-2 text-sm font-semibold text-[#3b1410]">
-                  <span
-                    className={
-                      selected
-                        ? "size-2 rounded-full bg-[#a80f1a]"
-                        : "size-2 rounded-full bg-[#d9aaa0]"
-                    }
-                  />
-                  {event.date} · {event.city}
-                </span>
-                <span className="mt-1 block text-xs leading-5 text-[#6b3a32]">{event.address}</span>
-              </button>
-
-              <a
-                href={getAmapNavigationUrl(event)}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full bg-[#9f101a] px-3 text-xs font-medium text-white transition-all hover:bg-[#7f0b13] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#c31b28]/30"
+                &#8249;
+              </Button>
+              <div className="relative max-h-[90vh] max-w-[90vw]">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={lightboxIndex}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.25, ease: "easeOut" }}
+                  >
+                    <Image
+                      loader={seaweedLoader}
+                      src={photos[lightboxIndex].src}
+                      alt={photos[lightboxIndex].alt}
+                      width={1200}
+                      height={1600}
+                      className="max-h-[90vh] max-w-full object-contain"
+                      priority
+                    />
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={next}
+                className="absolute right-2 top-1/2 z-10 -translate-y-1/2 text-3xl text-white/70 hover:bg-white/10 hover:text-white"
               >
-                导航
-                <ExternalLink className="size-3.5" />
-              </a>
-            </div>
-          );
-        })}
-      </div>
+                &#8250;
+              </Button>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

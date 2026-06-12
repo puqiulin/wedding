@@ -46,6 +46,15 @@ const fmtDate = (value: string | Date) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 };
 
+const countryFlagEmoji = (countryCode: string | null | undefined) => {
+  const code = countryCode?.trim().toUpperCase();
+  if (!code || !/^[A-Z]{2}$/.test(code)) return null;
+
+  return Array.from(code)
+    .map((letter) => String.fromCodePoint(0x1f1e6 + letter.charCodeAt(0) - 65))
+    .join("");
+};
+
 const s3 = ({ src }: ImageLoaderProps) =>
   `${process.env.NEXT_PUBLIC_S3_BASE}/${src}`;
 
@@ -175,51 +184,65 @@ function VisitorTable({ visits }: { visits: VisitorLogRow[] }) {
             </thead>
             <tbody>
               {visits.map((visit) => (
-                <tr key={visit.id} className="border-t align-top [&>td]:px-3 [&>td]:py-2">
-                  <td className="whitespace-nowrap text-muted-foreground">{fmtDate(visit.createdAt)}</td>
-                  <td className="whitespace-nowrap font-mono text-xs">{dash(visit.ip)}</td>
-                  <td className="whitespace-nowrap">
-                    <span className="flex items-center gap-1.5">
-                      <Flag className={tableIconClass} />
-                      <span>
-                        {dash(visit.countryName)}
-                        {visit.countryCode && <span className="ml-1 text-muted-foreground">({visit.countryCode})</span>}
-                      </span>
-                    </span>
-                  </td>
-                  <td className="max-w-[180px]">
-                    <div className="truncate">{dash(visit.autonomousSystemOrganization)}</div>
-                    {visit.autonomousSystemNumber && (
-                      <div className="text-xs text-muted-foreground">AS{visit.autonomousSystemNumber}</div>
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap">
-                    <span className="flex items-center gap-1.5">
-                      <Monitor className={tableIconClass} />
-                      {dash([visit.osName, visit.osVersion].filter(Boolean).join(" "))}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap">
-                    <span className="flex items-center gap-1.5">
-                      <Chrome className={tableIconClass} />
-                      {dash([visit.browserName, visit.browserVersion].filter(Boolean).join(" "))}
-                    </span>
-                  </td>
-                  <td className="max-w-[160px]">
-                    <div className="flex items-start gap-1.5">
-                      <Smartphone className={cn(tableIconClass, "mt-0.5")} />
-                      <div className="min-w-0">
-                        <div className="truncate">{dash([visit.deviceVendor, visit.deviceModel].filter(Boolean).join(" "))}</div>
-                        <div className="text-xs text-muted-foreground">{dash(visit.deviceType)}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="whitespace-nowrap text-xs">{dash(flagText(visit))}</td>
-                  <td className="max-w-[180px] truncate" title={visit.path}>{dash(visit.path)}</td>
-                  <td className="max-w-[280px] truncate text-xs text-muted-foreground" title={visit.userAgent}>
-                    {dash(visit.userAgent)}
-                  </td>
-                </tr>
+                (() => {
+                  const countryCode = visit.countryCode || visit.registeredCountryCode;
+                  const countryName = visit.countryName || visit.registeredCountryName;
+                  const countryIcon = countryFlagEmoji(countryCode);
+
+                  return (
+                    <tr key={visit.id} className="border-t align-top [&>td]:px-3 [&>td]:py-2">
+                      <td className="whitespace-nowrap text-muted-foreground">{fmtDate(visit.createdAt)}</td>
+                      <td className="whitespace-nowrap font-mono text-xs">{dash(visit.ip)}</td>
+                      <td className="whitespace-nowrap">
+                        <span className="flex items-center gap-1.5">
+                          {countryIcon ? (
+                            <span className="text-base leading-none" title={countryName || countryCode} aria-hidden="true">
+                              {countryIcon}
+                            </span>
+                          ) : (
+                            <Flag className={tableIconClass} />
+                          )}
+                          <span>
+                            {dash(countryName)}
+                            {countryCode && <span className="ml-1 text-muted-foreground">({countryCode})</span>}
+                          </span>
+                        </span>
+                      </td>
+                      <td className="max-w-[180px]">
+                        <div className="truncate">{dash(visit.autonomousSystemOrganization)}</div>
+                        {visit.autonomousSystemNumber && (
+                          <div className="text-xs text-muted-foreground">AS{visit.autonomousSystemNumber}</div>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap">
+                        <span className="flex items-center gap-1.5">
+                          <Monitor className={tableIconClass} />
+                          {dash([visit.osName, visit.osVersion].filter(Boolean).join(" "))}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap">
+                        <span className="flex items-center gap-1.5">
+                          <Chrome className={tableIconClass} />
+                          {dash([visit.browserName, visit.browserVersion].filter(Boolean).join(" "))}
+                        </span>
+                      </td>
+                      <td className="max-w-[160px]">
+                        <div className="flex items-start gap-1.5">
+                          <Smartphone className={cn(tableIconClass, "mt-0.5")} />
+                          <div className="min-w-0">
+                            <div className="truncate">{dash([visit.deviceVendor, visit.deviceModel].filter(Boolean).join(" "))}</div>
+                            <div className="text-xs text-muted-foreground">{dash(visit.deviceType)}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap text-xs">{dash(flagText(visit))}</td>
+                      <td className="max-w-[180px] truncate" title={visit.path}>{dash(visit.path)}</td>
+                      <td className="max-w-[280px] truncate text-xs text-muted-foreground" title={visit.userAgent}>
+                        {dash(visit.userAgent)}
+                      </td>
+                    </tr>
+                  );
+                })()
               ))}
             </tbody>
           </table>
