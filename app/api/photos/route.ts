@@ -1,19 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { getDb } from "@/lib/db";
 import { photos } from "@/lib/db/schema";
-import { asc } from "drizzle-orm";
+import { asc, desc } from "drizzle-orm";
 
 export async function GET() {
+  const db = getDb();
   const rows = await db.select().from(photos).orderBy(asc(photos.sortOrder));
   return NextResponse.json(rows);
 }
 
 export async function POST(req: NextRequest) {
+  const db = getDb();
   const { src, alt, fileName, fileSize } = await req.json();
   const [maxRow] = await db
     .select({ max: photos.sortOrder })
     .from(photos)
-    .orderBy(asc(photos.sortOrder));
+    .orderBy(desc(photos.sortOrder))
+    .limit(1);
   const nextOrder = maxRow?.max != null ? maxRow.max + 1 : 0;
   const [row] = await db
     .insert(photos)

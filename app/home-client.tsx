@@ -5,6 +5,7 @@ import Image, { ImageLoaderProps } from "next/image";
 import { Heart } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
+import { storagePublicUrl } from "@/lib/storage";
 import {
   Dialog,
   DialogContent,
@@ -14,8 +15,7 @@ import type { GalleryPhoto } from "@/lib/invitation-data";
 import { weddingEvents, type WeddingEvent } from "@/lib/venues";
 import { VenueInfo } from "./venue-info";
 
-const seaweedLoader = ({ src }: ImageLoaderProps) =>
-  `${process.env.NEXT_PUBLIC_S3_BASE}/${src}`;
+const r2Loader = ({ src }: ImageLoaderProps) => storagePublicUrl(src);
 
 export default function HomeClient({
   photos,
@@ -207,7 +207,7 @@ function AlbumGallery({ photos, bgmSrc }: { photos: GalleryPhoto[]; bgmSrc?: str
     <section className="relative bg-white">
       {bgmSrc && (
         <>
-          <audio ref={audioRef} src={`${process.env.NEXT_PUBLIC_S3_BASE}/${bgmSrc}`} loop />
+          <audio ref={audioRef} src={storagePublicUrl(bgmSrc)} loop />
           <Button
             onClick={toggleBgm}
             size="icon"
@@ -232,7 +232,7 @@ function AlbumGallery({ photos, bgmSrc }: { photos: GalleryPhoto[]; bgmSrc?: str
             className="block w-full cursor-zoom-in overflow-hidden transition-opacity hover:opacity-90"
           >
             <Image
-              loader={seaweedLoader}
+                  loader={r2Loader}
               src={photo.src}
               alt={photo.alt}
               width={600}
@@ -271,7 +271,7 @@ function AlbumGallery({ photos, bgmSrc }: { photos: GalleryPhoto[]; bgmSrc?: str
                     transition={{ duration: 0.25, ease: "easeOut" }}
                   >
                     <Image
-                      loader={seaweedLoader}
+                      loader={r2Loader}
                       src={photos[lightboxIndex].src}
                       alt={photos[lightboxIndex].alt}
                       width={1200}

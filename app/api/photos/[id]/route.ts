@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { getDb } from "@/lib/db";
 import { photos } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { deleteS3Object } from "@/lib/s3";
@@ -8,6 +8,7 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const db = getDb();
   const { id } = await params;
   const [row] = await db
     .select()

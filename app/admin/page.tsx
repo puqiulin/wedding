@@ -17,6 +17,7 @@ import {
   Chrome,
 } from "lucide-react";
 import type { Photo, Music as MusicType, VisitorLog } from "@/lib/db/schema";
+import { storagePublicUrl } from "@/lib/storage";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
@@ -55,8 +56,7 @@ const countryFlagEmoji = (countryCode: string | null | undefined) => {
     .join("");
 };
 
-const s3 = ({ src }: ImageLoaderProps) =>
-  `${process.env.NEXT_PUBLIC_S3_BASE}/${src}`;
+const r2Loader = ({ src }: ImageLoaderProps) => storagePublicUrl(src);
 
 function xhrUpload(url: string, file: File, onProgress: (p: number) => void) {
   return new Promise<void>((resolve, reject) => {
@@ -80,6 +80,10 @@ interface UploadItem {
 }
 
 type VisitorLogRow = Omit<VisitorLog, "createdAt"> & { createdAt: string };
+type VisitStats = {
+  totalViews: number;
+  uniqueVisitors: number;
+};
 
 // --- Upload Progress Panel ---
 
@@ -124,7 +128,7 @@ function UploadProgress({ items }: { items: UploadItem[] }) {
 
 // --- Visitor Table ---
 
-function VisitorTable({ visits }: { visits: VisitorLogRow[] }) {
+function VisitorTable({ visits, stats }: { visits: VisitorLogRow[]; stats: VisitStats }) {
   const flagText = (visit: VisitorLogRow) =>
     [
       visit.isAnonymous && "匿名",
@@ -144,7 +148,11 @@ function VisitorTable({ visits }: { visits: VisitorLogRow[] }) {
             <Globe2 className="size-4 text-muted-foreground" />
             访客信息
           </div>
-          <span className="text-xs text-muted-foreground">最近 {visits.length} 条</span>
+          <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span>总浏览 {stats.totalViews}</span>
+            <span>独立访客 {stats.uniqueVisitors}</span>
+            <span>最近 {visits.length} 条</span>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1080px] text-left text-sm">
@@ -272,7 +280,7 @@ function SortablePhoto({ photo, onDelete, deleting }: { photo: Photo; onDelete: 
         </div>
       )}
       <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing touch-none rounded-xl overflow-hidden">
-        <Image loader={s3} src={photo.src} alt={photo.alt} width={200} height={200}
+        <Image loader={r2Loader} src={photo.src} alt={photo.alt} width={200} height={200}
           className="w-full aspect-square object-cover transition-transform group-hover:scale-[1.02] pointer-events-none select-none [-webkit-touch-callout:none]" draggable={false} />
       </div>
       {photo.fileSize > 0 && (
@@ -311,6 +319,7 @@ export default function AdminPage() {
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
   const [musicFile, setMusicFile] = useState<MusicType | null>(null);
   const [visits, setVisits] = useState<VisitorLogRow[]>([]);
+  const [visitStats, setVisitStats] = useState<VisitStats>({ totalViews: 0, uniqueVisitors: 0 });
   const [musicProgress, setMusicProgress] = useState<number | null>(null);
   const [deletingMusic, setDeletingMusic] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -326,7 +335,23 @@ export default function AdminPage() {
 
   const fetchVisits = useCallback(async () => {
     const res = await fetch("/api/visits");
-    if (res.ok) setVisits(await res.json());
+    if (!res.ok) return;
+
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      setVisits(data);
+      setVisitStats({
+        totalViews: data.length,
+        uniqueVisitors: new Set(data.map((visit) => visit.ip)).size,
+      });
+      return;
+    }
+
+    setVisits(data.rows ?? []);
+    setVisitStats({
+      totalViews: data.stats?.totalViews ?? 0,
+      uniqueVisitors: data.stats?.uniqueVisitors ?? 0,
+    });
   }, []);
 
   useEffect(() => { fetchPhotos(); }, [fetchPhotos]);
@@ -427,7 +452,7 @@ export default function AdminPage() {
       {/* Top bar */}
       <header className="sticky top-0 z-20 border-b bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
-          <h1 className="text-lg font-semibold tracking-tight">相册管理</h1>
+          <h1 className="text-lg font-semibold tracking-tight">后台管理</h1>
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon-sm" onClick={() => { fetchPhotos(); fetchVisits(); }} aria-label="刷新">
               <RefreshCw className="size-4" />
@@ -541,7 +566,7 @@ export default function AdminPage() {
           )}
         </div>
 
-        <VisitorTable visits={visits} />
+        <VisitorTable visits={visits} stats={visitStats} />
       </main>
     </div>
   );

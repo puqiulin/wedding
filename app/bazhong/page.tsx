@@ -7,6 +7,8 @@ export const metadata = {
   title: "巴中婚礼邀请",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function BazhongPage() {
   const event = getVenueBySlug("bazhong");
   if (!event) notFound();

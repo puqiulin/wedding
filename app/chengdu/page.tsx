@@ -7,6 +7,8 @@ export const metadata = {
   title: "成都婚礼邀请",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function ChengduPage() {
   const event = getVenueBySlug("chengdu");
   if (!event) notFound();

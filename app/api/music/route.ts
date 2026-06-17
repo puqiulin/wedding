@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { getDb } from "@/lib/db";
 import { music } from "@/lib/db/schema";
 import { deleteS3Object } from "@/lib/s3";
 
 export async function GET() {
+  const db = getDb();
   const rows = await db.select().from(music).limit(1);
   return NextResponse.json(rows[0] ?? null);
 }
 
 export async function POST(req: NextRequest) {
+  const db = getDb();
   const { src, fileName, fileSize } = await req.json();
   // delete existing
   const existing = await db.select().from(music).limit(1);
@@ -21,6 +23,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE() {
+  const db = getDb();
   const existing = await db.select().from(music).limit(1);
   if (existing.length > 0) {
     await deleteS3Object(existing[0].src);

@@ -2,6 +2,19 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
 
-console.log("DATABASE_URL:", process.env.DATABASE_URL);
-const client = postgres(process.env.DATABASE_URL!);
-export const db = drizzle(client, { schema });
+function createDb() {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error("DATABASE_URL is required");
+  }
+
+  const client = postgres(databaseUrl, { max: 1 });
+  return drizzle(client, { schema });
+}
+
+let db: ReturnType<typeof createDb> | undefined;
+
+export function getDb() {
+  db ??= createDb();
+  return db;
+}
