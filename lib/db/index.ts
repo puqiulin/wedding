@@ -2,6 +2,12 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import * as schema from "./schema";
 
+declare global {
+  // Next compiles route bundles separately in dev/prod. Keep one PGlite instance
+  // per Node process so API writes and page reads see the same embedded database.
+  var weddingDbPromise: ReturnType<typeof createDb> | undefined;
+}
+
 const schemaSql = `
 CREATE TABLE IF NOT EXISTS "photos" (
   "id" serial PRIMARY KEY NOT NULL,
@@ -71,9 +77,7 @@ async function createDb() {
   return drizzle({ client, schema });
 }
 
-let dbPromise: ReturnType<typeof createDb> | undefined;
-
 export function getDb() {
-  dbPromise ??= createDb();
-  return dbPromise;
+  globalThis.weddingDbPromise ??= createDb();
+  return globalThis.weddingDbPromise;
 }
