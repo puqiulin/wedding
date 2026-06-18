@@ -4,13 +4,13 @@ import { photos } from "@/lib/db/schema";
 import { asc, desc } from "drizzle-orm";
 
 export async function GET() {
-  const db = getDb();
+  const db = await getDb();
   const rows = await db.select().from(photos).orderBy(asc(photos.sortOrder));
   return NextResponse.json(rows);
 }
 
 export async function POST(req: NextRequest) {
-  const db = getDb();
+  const db = await getDb();
   const { src, alt, fileName, fileSize } = await req.json();
   const [maxRow] = await db
     .select({ max: photos.sortOrder })

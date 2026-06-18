@@ -9,7 +9,7 @@ export type GalleryPhoto = {
 };
 
 export async function getInvitationData() {
-  const db = getDb();
+  const db = await getDb();
   const rows = await db.select().from(photos).orderBy(asc(photos.sortOrder));
   const musicRows = await db.select().from(music).limit(1);
 

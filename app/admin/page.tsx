@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import Image, { ImageLoaderProps } from "next/image";
+import Image from "next/image";
 import {
   DndContext, closestCenter, PointerSensor, TouchSensor,
   useSensor, useSensors, DragEndEvent,
@@ -17,7 +17,6 @@ import {
   Chrome,
 } from "lucide-react";
 import type { Photo, Music as MusicType, VisitorLog } from "@/lib/db/schema";
-import { storagePublicUrl } from "@/lib/storage";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
@@ -56,19 +55,34 @@ const countryFlagEmoji = (countryCode: string | null | undefined) => {
     .join("");
 };
 
-const r2Loader = ({ src }: ImageLoaderProps) => storagePublicUrl(src);
+type UploadedAsset = {
+  src: string;
+  fileName: string;
+  fileSize: number;
+};
 
-function xhrUpload(url: string, file: File, onProgress: (p: number) => void) {
-  return new Promise<void>((resolve, reject) => {
+function xhrUpload(file: File, folder: string | undefined, onProgress: (p: number) => void) {
+  return new Promise<UploadedAsset>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
     };
-    xhr.onload = () => (xhr.status < 300 ? resolve() : reject());
+    xhr.onload = () => {
+      if (xhr.status >= 300) {
+        reject();
+        return;
+      }
+
+      resolve(JSON.parse(xhr.responseText) as UploadedAsset);
+    };
     xhr.onerror = () => reject();
-    xhr.open("PUT", url);
-    xhr.setRequestHeader("Content-Type", file.type);
-    xhr.send(file);
+    xhr.open("POST", "/api/upload");
+
+    const formData = new FormData();
+    formData.append("file", file);
+    if (folder) formData.append("folder", folder);
+
+    xhr.send(formData);
   });
 }
 
@@ -280,7 +294,7 @@ function SortablePhoto({ photo, onDelete, deleting }: { photo: Photo; onDelete: 
         </div>
       )}
       <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing touch-none rounded-xl overflow-hidden">
-        <Image loader={r2Loader} src={photo.src} alt={photo.alt} width={200} height={200}
+        <Image src={photo.src} alt={photo.alt} width={200} height={200}
           className="w-full aspect-square object-cover transition-transform group-hover:scale-[1.02] pointer-events-none select-none [-webkit-touch-callout:none]" draggable={false} />
       </div>
       {photo.fileSize > 0 && (
@@ -358,15 +372,6 @@ export default function AdminPage() {
   useEffect(() => { fetchVisits(); }, [fetchVisits]);
   useEffect(() => { fetch("/api/music").then((r) => r.json()).then(setMusicFile); }, []);
 
-  async function uploadFile(file: File, folder?: string) {
-    const res = await fetch("/api/upload", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filename: file.name, contentType: file.type, folder }),
-    });
-    return res.json() as Promise<{ url: string; key: string }>;
-  }
-
   async function handlePhotos(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files?.length) return;
@@ -380,12 +385,11 @@ export default function AdminPage() {
 
     for (let i = 0; i < files.length; i++) {
       try {
-        const { url, key } = await uploadFile(files[i]);
-        await xhrUpload(url, files[i], (p) => update(i, { progress: p }));
+        const uploaded = await xhrUpload(files[i], undefined, (p) => update(i, { progress: p }));
         await fetch("/api/photos", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ src: key, alt: "", fileName: files[i].name, fileSize: files[i].size }),
+          body: JSON.stringify({ src: uploaded.src, alt: "", fileName: uploaded.fileName, fileSize: uploaded.fileSize }),
         });
         update(i, { progress: 100, status: "done" });
       } catch {
@@ -402,12 +406,11 @@ export default function AdminPage() {
     if (!file) return;
     setMusicProgress(0);
     try {
-      const { url, key } = await uploadFile(file, "music");
-      await xhrUpload(url, file, setMusicProgress);
+      const uploaded = await xhrUpload(file, "music", setMusicProgress);
       const m = await fetch("/api/music", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ src: key, fileName: file.name, fileSize: file.size }),
+        body: JSON.stringify({ src: uploaded.src, fileName: uploaded.fileName, fileSize: uploaded.fileSize }),
       }).then((r) => r.json());
       setMusicFile(m);
     } catch { /* noop */ }

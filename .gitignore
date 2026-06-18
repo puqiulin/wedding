@@ -13,6 +13,9 @@
 # testing
 /coverage
 
+# local embedded database
+/data/pglite/
+
 # next.js
 /.next/
 /out/

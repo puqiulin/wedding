@@ -23,14 +23,5 @@ db-generate: ## Generate Drizzle migrations from schema.ts
 	bun run db:generate
 
 .PHONY: migrate
-migrate: db-generate ## Apply migrations to the DB in .env (local/preview)
+migrate: db-generate ## Apply migrations to the PGlite data directory
 	bun run db:migrate
-
-.PHONY: migrate-prod
-migrate-prod: ## Apply migrations to the prod Neon branch (.env.prod)
-	set -a; . ./.env.prod; set +a; bun run db:migrate
-
-.PHONY: r2-cors
-r2-cors: ## Apply R2 CORS policy to dev + prod buckets
-	npx wrangler r2 bucket cors set wedding-dev --file cloudflare/r2-cors.json --force
-	npx wrangler r2 bucket cors set wedding-prod --file cloudflare/r2-cors.json --force

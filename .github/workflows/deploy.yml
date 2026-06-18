@@ -1,0 +1,91 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set image name
+        run: echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            NEXT_PUBLIC_AMAP_KEY=${{ secrets.NEXT_PUBLIC_AMAP_KEY }}
+            NEXT_PUBLIC_AMAP_SECURITY_JS_CODE=${{ secrets.NEXT_PUBLIC_AMAP_SECURITY_JS_CODE }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy to cd
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          GHCR_TOKEN: ${{ github.token }}
+          GHCR_USER: ${{ github.actor }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          NEXT_PUBLIC_AMAP_KEY: ${{ secrets.NEXT_PUBLIC_AMAP_KEY }}
+          NEXT_PUBLIC_AMAP_SECURITY_JS_CODE: ${{ secrets.NEXT_PUBLIC_AMAP_SECURITY_JS_CODE }}
+          DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '3000' }}
+        with:
+          host: 8.137.169.225
+          username: root
+          port: 22
+          key: ${{ secrets.CD_SSH_PRIVATE_KEY }}
+          envs: IMAGE_NAME,GHCR_TOKEN,GHCR_USER,ADMIN_PASSWORD,NEXT_PUBLIC_AMAP_KEY,NEXT_PUBLIC_AMAP_SECURITY_JS_CODE,DEPLOY_PORT
+          script: |
+            set -euo pipefail
+
+            APP_DIR=/opt/wedding
+            mkdir -p "$APP_DIR/data/pglite" "$APP_DIR/public/album" "$APP_DIR/public/music"
+
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            docker pull "$IMAGE_NAME:latest"
+
+            docker rm -f wedding || true
+            docker run -d \
+              --name wedding \
+              --restart unless-stopped \
+              -p "${DEPLOY_PORT:-3000}:3000" \
+              -e NODE_ENV=production \
+              -e PGLITE_DATA_DIR=/app/data/pglite \
+              -e ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+              -e NEXT_PUBLIC_AMAP_KEY="$NEXT_PUBLIC_AMAP_KEY" \
+              -e NEXT_PUBLIC_AMAP_SECURITY_JS_CODE="$NEXT_PUBLIC_AMAP_SECURITY_JS_CODE" \
+              -e MAXMIND_DB_PATH=/app/data/ip66.mmdb \
+              -v "$APP_DIR/data/pglite:/app/data/pglite" \
+              -v "$APP_DIR/public/album:/app/public/album" \
+              -v "$APP_DIR/public/music:/app/public/music" \
+              "$IMAGE_NAME:latest"
+
+            docker image prune -f

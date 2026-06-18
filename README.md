@@ -1,50 +1,61 @@
-# Cloudflare R2
+# Wedding
 
-Uploads use Cloudflare R2 through its S3-compatible API.
+Next.js wedding invitation site with an admin page for album photos, background music, and visit logs.
 
-Use the environment-specific templates:
+## Local Development
 
-- `.env.local.example` for local development: Neon `preview` branch + R2 `wedding-dev`
-- `.env.production.example` for Vercel production: Neon `prod` branch + R2 `wedding-prod`
+```shell
+cp .env.example .env
+bun install
+bun dev
+```
 
-# Deploy with Vercel + Neon
+The app uses PGlite instead of an external Postgres service. By default the embedded database is stored at `./data/pglite`; override it with `PGLITE_DATA_DIR`.
 
-Use Vercel's Git integration for deployments. Configure these environment variables in the Vercel project.
+Album images and background music are served directly from `public`:
 
-Required Vercel environment variables:
+- photos: `public/album`
+- music: `public/music`
 
-- `DATABASE_URL` - Neon pooled connection string with `sslmode=require`
+The admin upload API writes files into those directories and stores their public paths in PGlite.
+
+## Environment
+
+Required:
+
 - `ADMIN_PASSWORD`
-- `NEXT_PUBLIC_R2_BASE_URL`
+
+Optional:
+
+- `PGLITE_DATA_DIR` - defaults to `./data/pglite`
 - `NEXT_PUBLIC_AMAP_KEY`
-- `R2_ENDPOINT` or `R2_ACCOUNT_ID`
-- `R2_ACCESS_KEY_ID`
-- `R2_SECRET_ACCESS_KEY`
-- `R2_BUCKET`
-
-Optional Vercel environment variables:
-
 - `NEXT_PUBLIC_AMAP_SECURITY_JS_CODE`
-- `R2_REGION` - defaults to `auto`
-- `R2_FORCE_PATH_STYLE`
+- `MAXMIND_DB_PATH`
 
-Run Drizzle migrations against Neon before deploying schema changes:
-
-```shell
-DATABASE_URL='postgresql://...' bun run db:migrate
-```
-
-For local development:
+## Docker
 
 ```shell
-cp .env.local.example .env
+docker build -t wedding .
+docker run --rm -p 3000:3000 \
+  -e ADMIN_PASSWORD=changeme \
+  -e PGLITE_DATA_DIR=/app/data/pglite \
+  -v "$PWD/data/pglite:/app/data/pglite" \
+  -v "$PWD/public/album:/app/public/album" \
+  -v "$PWD/public/music:/app/public/music" \
+  wedding
 ```
 
-In Vercel, add the values from `.env.production.example` to the project environment variables.
+## Deployment
 
-Apply the R2 CORS policy after creating buckets:
+`.github/workflows/deploy.yml` runs on pushes to `main`, builds the Docker image, pushes it to `ghcr.io`, then deploys it to the `cd` server at `8.137.169.225`.
 
-```shell
-npx wrangler r2 bucket cors set wedding-dev --file cloudflare/r2-cors.json --force
-npx wrangler r2 bucket cors set wedding-prod --file cloudflare/r2-cors.json --force
-```
+Configure these GitHub secrets:
+
+- `CD_SSH_PRIVATE_KEY`
+- `ADMIN_PASSWORD`
+- `NEXT_PUBLIC_AMAP_KEY`
+- `NEXT_PUBLIC_AMAP_SECURITY_JS_CODE`
+
+Optional GitHub variable:
+
+- `DEPLOY_PORT` - defaults to `3000`
