@@ -68,6 +68,13 @@ jobs:
 
             APP_DIR=/opt/wedding
             mkdir -p "$APP_DIR/data/pglite" "$APP_DIR/public/album" "$APP_DIR/public/music"
+            chown -R 100:101 "$APP_DIR"
+
+            if ! command -v docker >/dev/null 2>&1; then
+              apt-get update
+              apt-get install -y docker.io
+              systemctl enable --now docker
+            fi
 
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             docker pull "$IMAGE_NAME:latest"
