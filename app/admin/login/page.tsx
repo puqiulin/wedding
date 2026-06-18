@@ -28,7 +28,8 @@ export default function LoginPage() {
       body: JSON.stringify({ password }),
     });
     if (res.ok) {
-      router.push("/admin");
+      router.replace("/admin");
+      router.refresh();
     } else {
       setError("密码错误");
     }

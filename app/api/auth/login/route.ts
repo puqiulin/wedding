@@ -6,10 +6,13 @@ export async function POST(req: NextRequest) {
   if (password !== process.env.ADMIN_PASSWORD) {
     return NextResponse.json({ error: "密码错误" }, { status: 401 });
   }
+  const isHttps =
+    req.nextUrl.protocol === "https:" ||
+    req.headers.get("x-forwarded-proto") === "https";
   const cookieStore = await cookies();
   cookieStore.set("admin_session", "authenticated", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isHttps,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24, // 1 day
