@@ -67,6 +67,100 @@ function getAmapNavigationUrl(event: WeddingEvent) {
   return `https://uri.amap.com/marker?position=${lng},${lat}&name=${name}&coordinate=gaode&callnative=1`;
 }
 
+const weekDays = ["一", "二", "三", "四", "五", "六", "日"];
+const lunarMonths = [
+  "正月",
+  "二月",
+  "三月",
+  "四月",
+  "五月",
+  "六月",
+  "七月",
+  "八月",
+  "九月",
+  "十月",
+  "冬月",
+  "腊月",
+];
+const lunarDays = [
+  "初一",
+  "初二",
+  "初三",
+  "初四",
+  "初五",
+  "初六",
+  "初七",
+  "初八",
+  "初九",
+  "初十",
+  "十一",
+  "十二",
+  "十三",
+  "十四",
+  "十五",
+  "十六",
+  "十七",
+  "十八",
+  "十九",
+  "二十",
+  "廿一",
+  "廿二",
+  "廿三",
+  "廿四",
+  "廿五",
+  "廿六",
+  "廿七",
+  "廿八",
+  "廿九",
+  "三十",
+];
+
+function parseIsoDate(isoDate: string) {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  return { year, month, day };
+}
+
+function getLocalDate(isoDate: string) {
+  const { year, month, day } = parseIsoDate(isoDate);
+  return new Date(year, month - 1, day);
+}
+
+function getWeddingDateDetails(isoDate: string) {
+  const date = getLocalDate(isoDate);
+  const weekday = new Intl.DateTimeFormat("zh-CN", { weekday: "long" }).format(date);
+  const lunarParts = new Intl.DateTimeFormat("zh-CN-u-ca-chinese", {
+    month: "numeric",
+    day: "numeric",
+  }).formatToParts(date);
+  const lunarMonth = Number(lunarParts.find((part) => part.type === "month")?.value);
+  const lunarDay = Number(lunarParts.find((part) => part.type === "day")?.value);
+
+  return {
+    weekday,
+    lunarDate:
+      Number.isInteger(lunarMonth) && Number.isInteger(lunarDay)
+        ? `农历${lunarMonths[lunarMonth - 1]}${lunarDays[lunarDay - 1]}`
+        : "农历日期",
+  };
+}
+
+function getMonthCalendar(isoDate: string) {
+  const { year, month, day: weddingDay } = parseIsoDate(isoDate);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const firstDay = new Date(year, month - 1, 1).getDay();
+  const leadingBlanks = (firstDay + 6) % 7;
+
+  return {
+    year,
+    month,
+    weddingDay,
+    slots: [
+      ...Array.from({ length: leadingBlanks }, () => null),
+      ...Array.from({ length: daysInMonth }, (_, index) => index + 1),
+    ],
+  };
+}
+
 export function VenueInfo({
   events = weddingEvents,
   className,
@@ -87,22 +181,77 @@ export function VenueInfo({
         {events.map((event) => (
           <div
             key={event.slug}
-            className="rounded-lg border border-[#d9aaa0]/55 bg-white/58 px-4 py-3 shadow-[0_12px_34px_rgba(138,27,21,0.08)] backdrop-blur"
+            className="rounded-lg bg-white/58 p-4 shadow-[0_12px_34px_rgba(138,27,21,0.08)] backdrop-blur"
           >
-            <p className="flex items-center gap-2 text-sm font-semibold text-[#9f101a]">
-              <CalendarDays className="size-4" />
-              <time dateTime={event.isoDate}>{event.date}</time>
-            </p>
-            <p className="mt-2 flex items-start gap-2 text-sm leading-6 text-[#6b3a32]">
-              <MapPin className="mt-1 size-4 shrink-0 text-[#b9232d]" />
-              <span>{event.address}</span>
-            </p>
+            <WeddingCalendar event={event} />
           </div>
         ))}
       </div>
 
       <VenueMaps events={events} />
     </section>
+  );
+}
+
+function WeddingCalendar({ event }: { event: WeddingEvent }) {
+  const calendar = getMonthCalendar(event.isoDate);
+  const weddingDateDetails = getWeddingDateDetails(event.isoDate);
+
+  return (
+    <div aria-label={`${event.city}${calendar.year}年${calendar.month}月婚期日历`}>
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="flex items-center gap-2 text-sm font-semibold text-[#9f101a]">
+            <CalendarDays className="size-4" />
+            <span>
+              {calendar.year}年{calendar.month}月
+            </span>
+          </p>
+          <p className="mt-1 text-xs leading-5 text-[#8a554d]">
+            {weddingDateDetails.lunarDate} · {weddingDateDetails.weekday}
+          </p>
+        </div>
+        <time
+          dateTime={event.isoDate}
+          className="shrink-0 rounded-full bg-[#fff1e8] px-3 py-1 text-xs font-medium text-[#9f101a] ring-1 ring-[#e5b4a5]/70"
+        >
+          {event.city}婚期
+        </time>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 text-center">
+        {weekDays.map((weekDay) => (
+          <span key={weekDay} className="text-[11px] font-medium text-[#9b6a62]">
+            {weekDay}
+          </span>
+        ))}
+
+        {calendar.slots.map((date, index) => {
+          if (date === null) {
+            return <span key={`empty-${index}`} aria-hidden className="aspect-square" />;
+          }
+
+          const isWeddingDay = date === calendar.weddingDay;
+
+          return (
+            <time
+              key={date}
+              dateTime={`${calendar.year}-${String(calendar.month).padStart(2, "0")}-${String(date).padStart(2, "0")}`}
+              className={[
+                "flex aspect-square min-h-9 flex-col items-center justify-center rounded-full text-sm leading-none",
+                isWeddingDay
+                  ? "bg-[#a80f1a] font-semibold text-white shadow-[0_10px_24px_rgba(168,15,26,0.26)] ring-2 ring-[#f5c7b0]"
+                  : "text-[#6b3a32]",
+              ].join(" ")}
+              aria-current={isWeddingDay ? "date" : undefined}
+            >
+              <span>{date}</span>
+              {isWeddingDay && <span className="mt-1 text-[9px] leading-none text-[#ffe4c8]">婚期</span>}
+            </time>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -114,7 +263,6 @@ function VenueMaps({ events }: { events: readonly WeddingEvent[] }) {
           <MapPin className="size-4" />
           婚礼地图
         </p>
-        <span className="text-xs text-[#8c5a52]">高德地图</span>
       </div>
 
       {events.map((event, index) => (
@@ -174,7 +322,7 @@ function VenueMapCard({ event, markerLabel }: { event: WeddingEvent; markerLabel
   }
 
   return (
-    <article className="rounded-lg border border-[#d9aaa0]/55 bg-white/62 p-3 shadow-[0_16px_42px_rgba(138,27,21,0.1)] backdrop-blur">
+    <article className="rounded-lg bg-white/62 p-3 shadow-[0_16px_42px_rgba(138,27,21,0.1)] backdrop-blur">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="flex items-center gap-2 text-sm font-semibold text-[#3b1410]">
@@ -196,7 +344,7 @@ function VenueMapCard({ event, markerLabel }: { event: WeddingEvent; markerLabel
 
       <div
         ref={mapContainerRef}
-        className="h-56 w-full overflow-hidden rounded-lg bg-[#f2d9d2] ring-1 ring-[#d9aaa0]/50"
+        className="h-56 w-full overflow-hidden rounded-lg bg-[#f2d9d2]"
         aria-label={`${event.city}婚礼地点地图`}
       />
 
@@ -205,7 +353,7 @@ function VenueMapCard({ event, markerLabel }: { event: WeddingEvent; markerLabel
       <button
         type="button"
         onClick={focusVenue}
-        className="mt-3 inline-flex h-8 w-full items-center justify-center rounded-full border border-[#d9aaa0]/60 bg-[#fff8f4]/72 text-xs font-medium text-[#9f101a] transition-all hover:bg-[#f7e5df] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#c31b28]/25"
+        className="mt-3 inline-flex h-8 w-full items-center justify-center rounded-full bg-[#fff8f4]/72 text-xs font-medium text-[#9f101a] transition-all hover:bg-[#f7e5df] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#c31b28]/25"
       >
         定位到{event.city}地点
       </button>

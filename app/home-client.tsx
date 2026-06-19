@@ -14,6 +14,34 @@ import type { GalleryPhoto } from "@/lib/invitation-data";
 import { weddingEvents, type WeddingEvent } from "@/lib/venues";
 import { VenueInfo } from "./venue-info";
 
+const galleryStories = [
+  {
+    title: "从遇见，到决定一起走很远",
+    body: "有些时刻不必太盛大，只要身边的人刚好是你。",
+    mode: "intro",
+  },
+  {
+    title: "最好的我们，在对的时间遇见",
+    body: "那天的阳光很好，你笑得刚刚好。",
+    mode: "side",
+  },
+  {
+    title: "把平凡日子，过成我们喜欢的样子",
+    body: "后来每个普通清晨，都有了值得期待的方向。",
+    mode: "overlay",
+  },
+  {
+    title: "有你在身边，每一天都很安心",
+    body: "一起看过的风景，都成了我们的回忆。",
+    mode: "side",
+  },
+  {
+    title: "这一程，想邀请你见证",
+    body: "未来的路，我们会一直牵着手，一起走下去。",
+    mode: "overlay",
+  },
+] as const;
+
 export default function HomeClient({
   photos,
   bgmSrc,
@@ -217,27 +245,93 @@ function AlbumGallery({ photos, bgmSrc }: { photos: GalleryPhoto[]; bgmSrc?: str
         </>
       )}
 
-      <div className="grid grid-cols-1">
-        {photos.map((photo, index) => (
-          <motion.button
-            key={photo.id}
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-50px" }}
-            transition={{ duration: 0.6, delay: index < 3 ? index * 0.15 : 0, ease: "easeOut" }}
-            onClick={() => setLightboxIndex(index)}
-            className="block w-full cursor-zoom-in overflow-hidden transition-opacity hover:opacity-90"
-          >
-            <Image
-              src={photo.src}
-              alt={photo.alt}
-              width={600}
-              height={600}
-              className="block h-full w-full object-cover"
-              sizes="100vw"
-            />
-          </motion.button>
-        ))}
+      <div className="mx-auto grid w-full max-w-5xl gap-10 px-6 py-12 sm:gap-14 sm:py-16">
+        {photos.map((photo, index) => {
+          const story = galleryStories[index % galleryStories.length];
+          const isIntro = index === 0;
+          const isOverlay = story.mode === "overlay";
+          const isReversed = index % 2 === 1;
+
+          if (isIntro) {
+            return (
+              <motion.figure
+                key={photo.id}
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-50px" }}
+                transition={{ duration: 0.6, ease: "easeOut" }}
+                className="grid gap-5"
+              >
+                <StoryImageButton
+                  photo={photo}
+                  index={index}
+                  onOpen={() => setLightboxIndex(index)}
+                  className="aspect-[4/5] sm:aspect-[16/9]"
+                  sizes="(min-width: 1024px) 960px, 100vw"
+                  priority
+                />
+                <figcaption className="mx-auto max-w-2xl text-center">
+                  <span className="mx-auto mb-3 block h-px w-24 bg-[#d7837d]/55" />
+                  <p className="text-xl font-semibold leading-8 text-[#9f101a] sm:text-2xl">{story.title}</p>
+                  <p className="mt-3 text-sm leading-7 text-[#8a554d]">{story.body}</p>
+                </figcaption>
+              </motion.figure>
+            );
+          }
+
+          if (isOverlay) {
+            return (
+              <motion.figure
+                key={photo.id}
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-50px" }}
+                transition={{ duration: 0.6, ease: "easeOut" }}
+              >
+                <StoryImageButton
+                  photo={photo}
+                  index={index}
+                  onOpen={() => setLightboxIndex(index)}
+                  className="aspect-[5/4] sm:aspect-[16/9]"
+                  sizes="(min-width: 1024px) 960px, 100vw"
+                >
+                  <span className="pointer-events-none absolute inset-x-0 bottom-0 flex min-h-36 flex-col justify-end bg-gradient-to-t from-black/58 via-black/22 to-transparent p-6 text-left text-white sm:p-8">
+                    <span className="max-w-md text-2xl font-semibold leading-9 sm:text-3xl">{story.title}</span>
+                    <span className="mt-3 max-w-md text-sm leading-7 text-white/82">{story.body}</span>
+                  </span>
+                </StoryImageButton>
+              </motion.figure>
+            );
+          }
+
+          return (
+            <motion.figure
+              key={photo.id}
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.6, ease: "easeOut" }}
+              className={[
+                "grid items-center gap-6 md:grid-cols-[1.35fr_0.85fr] md:gap-10",
+                isReversed ? "md:grid-flow-col-dense" : "",
+              ].join(" ")}
+            >
+              <StoryImageButton
+                photo={photo}
+                index={index}
+                onOpen={() => setLightboxIndex(index)}
+                className={["aspect-[4/5] sm:aspect-[4/3]", isReversed ? "md:col-start-2" : ""].join(" ")}
+                sizes="(min-width: 1024px) 600px, 100vw"
+              />
+              <StoryCaption
+                number={index}
+                title={story.title}
+                body={story.body}
+                className={isReversed ? "md:col-start-1 md:row-start-1" : ""}
+              />
+            </motion.figure>
+          );
+        })}
       </div>
 
       {!photos.length && (
@@ -290,5 +384,66 @@ function AlbumGallery({ photos, bgmSrc }: { photos: GalleryPhoto[]; bgmSrc?: str
         </DialogContent>
       </Dialog>
     </section>
+  );
+}
+
+function StoryImageButton({
+  photo,
+  index,
+  onOpen,
+  className,
+  sizes,
+  priority = false,
+  children,
+}: {
+  photo: GalleryPhoto;
+  index: number;
+  onOpen: () => void;
+  className: string;
+  sizes: string;
+  priority?: boolean;
+  children?: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={[
+        "group relative block w-full cursor-zoom-in overflow-hidden rounded-lg bg-[#f3ded8] shadow-[0_18px_44px_rgba(138,27,21,0.12)] outline-none transition-transform duration-300 hover:-translate-y-1 focus-visible:ring-3 focus-visible:ring-[#c31b28]/25",
+        className,
+      ].join(" ")}
+      aria-label={`预览第${index + 1}张照片`}
+    >
+      <Image
+        src={photo.src}
+        alt={photo.alt}
+        fill
+        className="object-cover transition duration-500 group-hover:scale-[1.03]"
+        sizes={sizes}
+        priority={priority}
+      />
+      {children}
+    </button>
+  );
+}
+
+function StoryCaption({
+  number,
+  title,
+  body,
+  className,
+}: {
+  number: number;
+  title: string;
+  body: string;
+  className?: string;
+}) {
+  return (
+    <figcaption className={["px-1 text-left", className].filter(Boolean).join(" ")}>
+      <p className="font-serif text-3xl italic leading-none text-[#b7464a]">{String(number).padStart(2, "0")}.</p>
+      <h2 className="mt-5 max-w-xs text-2xl font-semibold leading-10 text-[#9f101a]">{title}</h2>
+      <span className="mt-5 block h-px w-10 bg-[#b7464a]" />
+      <p className="mt-5 max-w-xs text-sm leading-7 text-[#8a554d]">{body}</p>
+    </figcaption>
   );
 }
