@@ -58,4 +58,4 @@ Configure these GitHub secrets:
 
 Optional GitHub variable:
 
-- `DEPLOY_PORT` - defaults to `3000`
+- `DEPLOY_PORT` - defaults to `80`
