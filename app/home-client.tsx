@@ -99,6 +99,7 @@ export default function HomeClient({
         <>
           <AlbumGallery photos={photos} bgmSrc={bgmSrc} />
           <VenueInfo events={venueEvents} />
+          <SiteFooter />
         </>
       )}
 
@@ -180,6 +181,21 @@ export default function HomeClient({
         </motion.div>
       )}
     </main>
+  );
+}
+
+function SiteFooter() {
+  return (
+    <footer className="relative border-t border-[#d7837d]/15 bg-[#fff8f4] px-6 py-6 text-center text-xs text-[#8a554d]">
+      <a
+        href="https://beian.miit.gov.cn/"
+        target="_blank"
+        rel="noreferrer"
+        className="transition-colors hover:text-[#9f101a]"
+      >
+        蜀ICP备2026033844号-1
+      </a>
+    </footer>
   );
 }
 

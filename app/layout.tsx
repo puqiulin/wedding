@@ -8,17 +8,22 @@ import { VisitorTracker } from "./visitor-tracker";
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://wedding.sprite3366.cn"),
   title: "我们结婚啦",
   description: "诚挚邀请您参加我们的婚礼",
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
     title: "我们结婚啦",
     description: "何星朋🩷王培琳",
     type: "website",
+    url: "/",
     images: [
       {
         url: "/sprite.jpg",
-        width: 1200,
-        height: 630,
+        width: 1080,
+        height: 714,
         alt: "婚礼邀请函",
       },
     ],
