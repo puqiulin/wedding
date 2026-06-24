@@ -3,7 +3,7 @@ import { promises as fs } from "fs";
 import path from "path";
 
 const publicRoot = path.join(process.cwd(), "public");
-const allowedFolders = new Set(["album", "music"]);
+const allowedFolders = new Set(["album", "cover", "music"]);
 
 function normalizeFolder(folder: unknown) {
   const value = typeof folder === "string" && folder ? folder : "album";
@@ -50,13 +50,13 @@ export async function savePublicAsset(file: File, folderInput: unknown) {
 }
 
 export async function deletePublicAsset(src: string) {
-  if (!src.startsWith("/album/") && !src.startsWith("/music/")) return;
+  if (!src.startsWith("/album/") && !src.startsWith("/cover/") && !src.startsWith("/music/")) return;
 
   await fs.rm(resolvePublicAsset(src), { force: true });
 }
 
 export async function readPublicAsset(src: string) {
-  if (!src.startsWith("/album/") && !src.startsWith("/music/")) {
+  if (!src.startsWith("/album/") && !src.startsWith("/cover/") && !src.startsWith("/music/")) {
     return null;
   }
 

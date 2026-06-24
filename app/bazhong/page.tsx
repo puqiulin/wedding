@@ -1,18 +1,33 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import HomeClient from "../home-client";
+import { translations } from "@/lib/i18n";
+import { getRequestLocale } from "@/lib/i18n-server";
 import { getInvitationData } from "@/lib/invitation-data";
 import { getVenueBySlug } from "@/lib/venues";
 
-export const metadata = {
-  title: "巴中婚礼邀请",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getRequestLocale();
+  const copy = translations[locale];
+  return {
+    title: copy.routeTitles.bazhong,
+    openGraph: {
+      title: copy.routeTitles.bazhong,
+      description: copy.metadata.routeDescription,
+      images: [{ url: "/sprite.jpg", width: 1080, height: 714, alt: copy.metadata.imageAlt }],
+    },
+  };
+}
 
 export const dynamic = "force-dynamic";
 
 export default async function BazhongPage() {
   const event = getVenueBySlug("bazhong");
   if (!event) notFound();
-  const { photos, bgmSrc } = await getInvitationData();
+  const [{ photos, bgmSrc, coverSrc }, initialLocale] = await Promise.all([
+    getInvitationData(),
+    getRequestLocale(),
+  ]);
 
-  return <HomeClient photos={photos} bgmSrc={bgmSrc} venueEvents={[event]} />;
+  return <HomeClient photos={photos} bgmSrc={bgmSrc} coverSrc={coverSrc} venueEvents={[event]} initialLocale={initialLocale} />;
 }

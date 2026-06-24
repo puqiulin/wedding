@@ -14,12 +14,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const pageParam = Number.parseInt(req.nextUrl.searchParams.get("page") ?? "", 10);
+  const pageSizeParam = Number.parseInt(req.nextUrl.searchParams.get("pageSize") ?? "", 10);
+  const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
+  const pageSize = Number.isFinite(pageSizeParam) && pageSizeParam > 0
+    ? Math.min(pageSizeParam, 100)
+    : 20;
+
   const [rows, totals] = await Promise.all([
     db
       .select()
       .from(visitorLogs)
       .orderBy(desc(visitorLogs.createdAt))
-      .limit(200),
+      .limit(pageSize)
+      .offset((page - 1) * pageSize),
     db
       .select({
         totalViews: count(),
@@ -28,11 +36,19 @@ export async function GET(req: NextRequest) {
       .from(visitorLogs),
   ]);
 
+  const totalViews = Number(totals[0]?.totalViews ?? 0);
+
   return NextResponse.json({
     rows,
     stats: {
-      totalViews: Number(totals[0]?.totalViews ?? 0),
+      totalViews,
       uniqueVisitors: Number(totals[0]?.uniqueVisitors ?? 0),
+    },
+    pagination: {
+      page,
+      pageSize,
+      totalItems: totalViews,
+      totalPages: Math.max(1, Math.ceil(totalViews / pageSize)),
     },
   });
 }

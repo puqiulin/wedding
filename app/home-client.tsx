@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
-import { Heart } from "lucide-react";
+import { Heart, Languages } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,49 +11,64 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { GalleryPhoto } from "@/lib/invitation-data";
+import {
+  defaultLocale,
+  isLocale,
+  localeStorageKey,
+  translations,
+  type Locale,
+} from "@/lib/i18n";
 import { weddingEvents, type WeddingEvent } from "@/lib/venues";
 import { VenueInfo } from "./venue-info";
 
-const galleryStories = [
-  {
-    title: "从遇见，到决定一起走很远",
-    body: "有些时刻不必太盛大，只要身边的人刚好是你。",
-    mode: "intro",
-  },
-  {
-    title: "最好的我们，在对的时间遇见",
-    body: "那天的阳光很好，你笑得刚刚好。",
-    mode: "side",
-  },
-  {
-    title: "把平凡日子，过成我们喜欢的样子",
-    body: "后来每个普通清晨，都有了值得期待的方向。",
-    mode: "overlay",
-  },
-  {
-    title: "有你在身边，每一天都很安心",
-    body: "一起看过的风景，都成了我们的回忆。",
-    mode: "side",
-  },
-  {
-    title: "这一程，想邀请你见证",
-    body: "未来的路，我们会一直牵着手，一起走下去。",
-    mode: "overlay",
-  },
-] as const;
+const galleryStoryModes = ["intro", "side", "overlay", "side", "overlay"] as const;
+
+function subscribeToLocale(onStoreChange: () => void) {
+  window.addEventListener("storage", onStoreChange);
+  window.addEventListener("wedding-locale-change", onStoreChange);
+  return () => {
+    window.removeEventListener("storage", onStoreChange);
+    window.removeEventListener("wedding-locale-change", onStoreChange);
+  };
+}
+
+function getLocaleSnapshot(): Locale {
+  const savedLocale = window.localStorage.getItem(localeStorageKey);
+  return isLocale(savedLocale) ? savedLocale : defaultLocale;
+}
+
+function setStoredLocale(locale: Locale) {
+  window.localStorage.setItem(localeStorageKey, locale);
+  document.cookie = `${localeStorageKey}=${locale}; Path=/; Max-Age=31536000; SameSite=Lax`;
+  window.dispatchEvent(new Event("wedding-locale-change"));
+}
 
 export default function HomeClient({
   photos,
   bgmSrc,
+  coverSrc = "/sprite.jpg",
   venueEvents = weddingEvents,
+  initialLocale = defaultLocale,
 }: {
   photos: GalleryPhoto[];
   bgmSrc?: string;
+  coverSrc?: string;
   venueEvents?: readonly WeddingEvent[];
+  initialLocale?: Locale;
 }) {
   const [opened, setOpened] = useState(false);
   const [coverHidden, setCoverHidden] = useState(false);
+  const locale = useSyncExternalStore(subscribeToLocale, getLocaleSnapshot, () => initialLocale);
   const reduceMotion = useReducedMotion();
+  const copy = translations[locale];
+  const pageTitle = venueEvents.length === 1
+    ? copy.routeTitles[venueEvents[0].slug]
+    : copy.siteTitle;
+
+  useEffect(() => {
+    document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
+    document.title = pageTitle;
+  }, [locale, pageTitle]);
 
   function openInvitation() {
     if (opened) return;
@@ -62,6 +77,7 @@ export default function HomeClient({
 
   return (
     <main className="relative min-h-screen overflow-x-hidden bg-[#fff8f4] text-[#3b1410]">
+      <LanguageSwitcher locale={locale} onLocaleChange={setStoredLocale} />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#ffe5dc_0,transparent_38%),linear-gradient(135deg,#fffaf7_0%,#fceae2_52%,#fff7f0_100%)]" />
       <motion.section
         aria-hidden={!coverHidden}
@@ -77,9 +93,9 @@ export default function HomeClient({
         <div className="relative">
           <div className="absolute -inset-3 rounded-full bg-[#a90f1a]/10 blur-2xl" />
           <Image
-            alt="婚礼邀请函照片"
+            alt={copy.hero.photoAlt}
             className="relative size-52 rounded-full border-4 border-white object-cover shadow-[0_22px_70px_rgba(138,27,21,0.22)] sm:size-64"
-            src="/sprite.jpg"
+            src={coverSrc}
             width={256}
             height={256}
             priority
@@ -88,17 +104,17 @@ export default function HomeClient({
 
         <div className="space-y-3">
           <p className="text-sm font-medium tracking-[0.24em] text-[#a80f1a]">WEDDING INVITATION</p>
-          <h1 className="text-4xl font-semibold leading-tight sm:text-5xl">我们结婚啦</h1>
+          <h1 className="text-4xl font-semibold leading-tight sm:text-5xl">{copy.hero.heading}</h1>
           <p className="text-base text-[#6b3a32] sm:text-lg">何星朋 &amp; 王培琳</p>
         </div>
 
-        <p className="max-w-xs text-sm leading-6 text-[#8a554d]">请下滑查看相册与婚礼地点</p>
+        <p className="max-w-xs text-sm leading-6 text-[#8a554d]">{copy.hero.scrollHint}</p>
       </motion.section>
 
       {opened && (
         <>
-          <AlbumGallery photos={photos} bgmSrc={bgmSrc} />
-          <VenueInfo events={venueEvents} />
+          <AlbumGallery photos={photos} bgmSrc={bgmSrc} locale={locale} />
+          <VenueInfo events={venueEvents} locale={locale} />
           <SiteFooter />
         </>
       )}
@@ -150,7 +166,7 @@ export default function HomeClient({
 
             <motion.button
               type="button"
-              aria-label="打开婚礼邀请函"
+              aria-label={copy.hero.openInvitation}
               disabled={opened}
               onClick={openInvitation}
               className="absolute left-1/2 top-[52%] z-10 flex size-24 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-[#ffe0a5]/70 bg-[#f8c76c] text-5xl font-semibold text-[#850910] shadow-[0_18px_38px_rgba(71,0,0,0.28)] outline-none transition-transform hover:scale-105 focus-visible:ring-4 focus-visible:ring-[#ffd8a2]/55 disabled:cursor-default sm:size-28 sm:text-6xl"
@@ -171,7 +187,7 @@ export default function HomeClient({
                 INVITATION
               </span>
               <span className="absolute left-1/2 top-[38%] w-full -translate-x-1/2 -translate-y-1/2 space-y-4 px-8">
-                <span className="block text-4xl font-semibold leading-none sm:text-5xl">诚挚邀请</span>
+                <span className="block text-4xl font-semibold leading-none sm:text-5xl">{copy.hero.invitationTitle}</span>
               </span>
               <span className="absolute left-1/2 top-[63%] w-full -translate-x-1/2 -translate-y-1/2 px-8 text-base text-[#ffe7bf]/90">
                 何星朋 &amp; 王培琳
@@ -181,6 +197,38 @@ export default function HomeClient({
         </motion.div>
       )}
     </main>
+  );
+}
+
+function LanguageSwitcher({
+  locale,
+  onLocaleChange,
+}: {
+  locale: Locale;
+  onLocaleChange: (locale: Locale) => void;
+}) {
+  return (
+    <div
+      className="fixed right-4 top-4 z-[70] flex h-9 items-center gap-1 rounded-full bg-white/88 p-1 text-xs font-semibold text-[#6b3a32] shadow-[0_8px_24px_rgba(59,20,16,0.16)] backdrop-blur-md sm:right-6 sm:top-6"
+      role="group"
+      aria-label="切换语言 / Switch language"
+    >
+      <Languages className="ml-1 size-4 text-[#9f101a]" aria-hidden="true" />
+      {(["zh", "en"] as const).map((option) => (
+        <button
+          key={option}
+          type="button"
+          onClick={() => onLocaleChange(option)}
+          aria-pressed={locale === option}
+          className={[
+            "flex h-7 min-w-8 items-center justify-center rounded-full px-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c31b28]/35",
+            locale === option ? "bg-[#9f101a] text-white" : "hover:bg-[#f7e5df]",
+          ].join(" ")}
+        >
+          {option === "zh" ? "中" : "EN"}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -199,10 +247,11 @@ function SiteFooter() {
   );
 }
 
-function AlbumGallery({ photos, bgmSrc }: { photos: GalleryPhoto[]; bgmSrc?: string }) {
+function AlbumGallery({ photos, bgmSrc, locale }: { photos: GalleryPhoto[]; bgmSrc?: string; locale: Locale }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [playing, setPlaying] = useState(true);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const copy = translations[locale];
 
   useEffect(() => {
     if (!bgmSrc) return;
@@ -254,7 +303,7 @@ function AlbumGallery({ photos, bgmSrc }: { photos: GalleryPhoto[]; bgmSrc?: str
             size="icon"
             variant="secondary"
             className="fixed bottom-6 right-6 z-40 rounded-full bg-black/50 text-white backdrop-blur hover:bg-black/70"
-            aria-label={playing ? "暂停音乐" : "播放音乐"}
+            aria-label={playing ? copy.album.pauseMusic : copy.album.playMusic}
           >
             {playing ? "\u23F8" : "\u25B6"}
           </Button>
@@ -263,9 +312,11 @@ function AlbumGallery({ photos, bgmSrc }: { photos: GalleryPhoto[]; bgmSrc?: str
 
       <div className="mx-auto grid w-full max-w-5xl gap-10 px-6 py-12 sm:gap-14 sm:py-16">
         {photos.map((photo, index) => {
-          const story = galleryStories[index % galleryStories.length];
+          const storyIndex = index % copy.stories.length;
+          const story = copy.stories[storyIndex];
+          const storyMode = galleryStoryModes[storyIndex];
           const isIntro = index === 0;
-          const isOverlay = story.mode === "overlay";
+          const isOverlay = storyMode === "overlay";
           const isReversed = index % 2 === 1;
 
           if (isIntro) {
@@ -280,11 +331,11 @@ function AlbumGallery({ photos, bgmSrc }: { photos: GalleryPhoto[]; bgmSrc?: str
               >
                 <StoryImageButton
                   photo={photo}
-                  index={index}
                   onOpen={() => setLightboxIndex(index)}
                   className="aspect-[4/5] sm:aspect-[16/9]"
                   sizes="(min-width: 1024px) 960px, 100vw"
                   priority
+                  previewLabel={copy.album.previewPhoto(index + 1)}
                 />
                 <figcaption className="mx-auto max-w-2xl text-center">
                   <span className="mx-auto mb-3 block h-px w-24 bg-[#d7837d]/55" />
@@ -306,10 +357,10 @@ function AlbumGallery({ photos, bgmSrc }: { photos: GalleryPhoto[]; bgmSrc?: str
               >
                 <StoryImageButton
                   photo={photo}
-                  index={index}
                   onOpen={() => setLightboxIndex(index)}
                   className="aspect-[5/4] sm:aspect-[16/9]"
                   sizes="(min-width: 1024px) 960px, 100vw"
+                  previewLabel={copy.album.previewPhoto(index + 1)}
                 >
                   <span className="pointer-events-none absolute inset-x-0 bottom-0 flex min-h-36 flex-col justify-end bg-gradient-to-t from-black/58 via-black/22 to-transparent p-6 text-left text-white sm:p-8">
                     <span className="max-w-md text-2xl font-semibold leading-9 sm:text-3xl">{story.title}</span>
@@ -334,10 +385,10 @@ function AlbumGallery({ photos, bgmSrc }: { photos: GalleryPhoto[]; bgmSrc?: str
             >
               <StoryImageButton
                 photo={photo}
-                index={index}
                 onOpen={() => setLightboxIndex(index)}
                 className={["aspect-[4/5] sm:aspect-[4/3]", isReversed ? "md:col-start-2" : ""].join(" ")}
                 sizes="(min-width: 1024px) 600px, 100vw"
+                previewLabel={copy.album.previewPhoto(index + 1)}
               />
               <StoryCaption
                 number={index}
@@ -351,18 +402,19 @@ function AlbumGallery({ photos, bgmSrc }: { photos: GalleryPhoto[]; bgmSrc?: str
       </div>
 
       {!photos.length && (
-        <div className="px-6 py-20 text-center text-sm text-[#8a554d]">暂无相册照片</div>
+        <div className="px-6 py-20 text-center text-sm text-[#8a554d]">{copy.album.empty}</div>
       )}
 
       <Dialog open={lightboxIndex !== null} onOpenChange={(open) => { if (!open) setLightboxIndex(null); }}>
         <DialogContent className="max-h-[95vh] max-w-[95vw] border-none bg-black/95 p-0 flex items-center justify-center [&>button]:text-white [&>button]:hover:text-white/80">
-          <DialogTitle className="sr-only">照片预览</DialogTitle>
+          <DialogTitle className="sr-only">{copy.album.photoPreview}</DialogTitle>
           {lightboxIndex !== null && (
             <>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={prev}
+                aria-label={copy.album.previousPhoto}
                 className="absolute left-2 top-1/2 z-10 -translate-y-1/2 text-3xl text-white/70 hover:bg-white/10 hover:text-white"
               >
                 &#8249;
@@ -391,6 +443,7 @@ function AlbumGallery({ photos, bgmSrc }: { photos: GalleryPhoto[]; bgmSrc?: str
                 variant="ghost"
                 size="icon"
                 onClick={next}
+                aria-label={copy.album.nextPhoto}
                 className="absolute right-2 top-1/2 z-10 -translate-y-1/2 text-3xl text-white/70 hover:bg-white/10 hover:text-white"
               >
                 &#8250;
@@ -405,18 +458,18 @@ function AlbumGallery({ photos, bgmSrc }: { photos: GalleryPhoto[]; bgmSrc?: str
 
 function StoryImageButton({
   photo,
-  index,
   onOpen,
   className,
   sizes,
+  previewLabel,
   priority = false,
   children,
 }: {
   photo: GalleryPhoto;
-  index: number;
   onOpen: () => void;
   className: string;
   sizes: string;
+  previewLabel: string;
   priority?: boolean;
   children?: React.ReactNode;
 }) {
@@ -428,7 +481,7 @@ function StoryImageButton({
         "group relative block w-full cursor-zoom-in overflow-hidden rounded-lg bg-[#f3ded8] shadow-[0_18px_44px_rgba(138,27,21,0.12)] outline-none transition-transform duration-300 hover:-translate-y-1 focus-visible:ring-3 focus-visible:ring-[#c31b28]/25",
         className,
       ].join(" ")}
-      aria-label={`预览第${index + 1}张照片`}
+      aria-label={previewLabel}
     >
       <Image
         src={photo.src}

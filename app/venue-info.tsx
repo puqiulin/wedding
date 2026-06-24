@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CalendarDays, ExternalLink, MapPin } from "lucide-react";
+import { getLocalizedVenue, translations, type Locale } from "@/lib/i18n";
 import { weddingEvents, type WeddingEvent } from "@/lib/venues";
 
 type AMapPosition = readonly [number, number];
@@ -61,13 +62,14 @@ function loadAmap(key: string) {
   return amapLoaderPromise;
 }
 
-function getAmapNavigationUrl(event: WeddingEvent) {
+function getAmapNavigationUrl(event: WeddingEvent, locale: Locale) {
   const [lng, lat] = event.position;
-  const name = encodeURIComponent(`${event.city}婚礼地点 ${event.address}`);
+  const copy = translations[locale].venue;
+  const venue = getLocalizedVenue(event.slug, locale);
+  const name = encodeURIComponent(copy.navigationName(venue.city, venue.address));
   return `https://uri.amap.com/marker?position=${lng},${lat}&name=${name}&coordinate=gaode&callnative=1`;
 }
 
-const weekDays = ["一", "二", "三", "四", "五", "六", "日"];
 const lunarMonths = [
   "正月",
   "二月",
@@ -125,9 +127,10 @@ function getLocalDate(isoDate: string) {
   return new Date(year, month - 1, day);
 }
 
-function getWeddingDateDetails(isoDate: string) {
+function getWeddingDateDetails(isoDate: string, locale: Locale) {
   const date = getLocalDate(isoDate);
-  const weekday = new Intl.DateTimeFormat("zh-CN", { weekday: "long" }).format(date);
+  const copy = translations[locale].venue;
+  const weekday = new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", { weekday: "long" }).format(date);
   const lunarParts = new Intl.DateTimeFormat("zh-CN-u-ca-chinese", {
     month: "numeric",
     day: "numeric",
@@ -139,9 +142,24 @@ function getWeddingDateDetails(isoDate: string) {
     weekday,
     lunarDate:
       Number.isInteger(lunarMonth) && Number.isInteger(lunarDay)
-        ? `农历${lunarMonths[lunarMonth - 1]}${lunarDays[lunarDay - 1]}`
-        : "农历日期",
+        ? locale === "zh"
+          ? copy.lunarDate(lunarMonths[lunarMonth - 1], lunarDays[lunarDay - 1])
+          : copy.lunarDate(String(lunarMonth), String(lunarDay))
+        : copy.lunarFallback,
   };
+}
+
+function getDisplayDate(isoDate: string, locale: Locale) {
+  if (locale === "zh") {
+    const { year, month, day } = parseIsoDate(isoDate);
+    return `${year}.${month}.${day}`;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(getLocalDate(isoDate));
 }
 
 function getMonthCalendar(isoDate: string) {
@@ -163,9 +181,11 @@ function getMonthCalendar(isoDate: string) {
 
 export function VenueInfo({
   events = weddingEvents,
+  locale,
   className,
 }: {
   events?: readonly WeddingEvent[];
+  locale: Locale;
   className?: string;
 }) {
   const sectionClassName = [
@@ -183,45 +203,45 @@ export function VenueInfo({
             key={event.slug}
             className="rounded-lg bg-white/58 p-4 shadow-[0_12px_34px_rgba(138,27,21,0.08)] backdrop-blur"
           >
-            <WeddingCalendar event={event} />
+            <WeddingCalendar event={event} locale={locale} />
           </div>
         ))}
       </div>
 
-      <VenueMaps events={events} />
+      <VenueMaps events={events} locale={locale} />
     </section>
   );
 }
 
-function WeddingCalendar({ event }: { event: WeddingEvent }) {
+function WeddingCalendar({ event, locale }: { event: WeddingEvent; locale: Locale }) {
   const calendar = getMonthCalendar(event.isoDate);
-  const weddingDateDetails = getWeddingDateDetails(event.isoDate);
+  const weddingDateDetails = getWeddingDateDetails(event.isoDate, locale);
+  const copy = translations[locale].venue;
+  const venue = getLocalizedVenue(event.slug, locale);
 
   return (
-    <div aria-label={`${event.city}${calendar.year}年${calendar.month}月婚期日历`}>
+    <div aria-label={copy.calendarLabel(venue.city, calendar.year, calendar.month)}>
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="flex items-center gap-2 text-sm font-semibold text-[#9f101a]">
             <CalendarDays className="size-4" />
-            <span>
-              {calendar.year}年{calendar.month}月
-            </span>
+            <span>{copy.monthHeading(calendar.year, calendar.month)}</span>
           </p>
           <p className="mt-1 text-xs leading-5 text-[#8a554d]">
-            {weddingDateDetails.lunarDate} · {weddingDateDetails.weekday}
+            {weddingDateDetails.lunarDate}{copy.dateSeparator}{weddingDateDetails.weekday}
           </p>
         </div>
         <time
           dateTime={event.isoDate}
           className="shrink-0 rounded-full bg-[#fff1e8] px-3 py-1 text-xs font-medium text-[#9f101a] ring-1 ring-[#e5b4a5]/70"
         >
-          {event.city}婚期
+          {copy.weddingTag(venue.city)}
         </time>
       </div>
 
       <div className="grid grid-cols-7 gap-1 text-center">
-        {weekDays.map((weekDay) => (
-          <span key={weekDay} className="text-[11px] font-medium text-[#9b6a62]">
+        {copy.weekDays.map((weekDay, index) => (
+          <span key={`${weekDay}-${index}`} className="text-[11px] font-medium text-[#9b6a62]">
             {weekDay}
           </span>
         ))}
@@ -246,7 +266,7 @@ function WeddingCalendar({ event }: { event: WeddingEvent }) {
               aria-current={isWeddingDay ? "date" : undefined}
             >
               <span>{date}</span>
-              {isWeddingDay && <span className="mt-1 text-[9px] leading-none text-[#ffe4c8]">婚期</span>}
+              {isWeddingDay && <span className="mt-1 text-[9px] leading-none text-[#ffe4c8]">{copy.weddingDay}</span>}
             </time>
           );
         })}
@@ -255,30 +275,33 @@ function WeddingCalendar({ event }: { event: WeddingEvent }) {
   );
 }
 
-function VenueMaps({ events }: { events: readonly WeddingEvent[] }) {
+function VenueMaps({ events, locale }: { events: readonly WeddingEvent[]; locale: Locale }) {
+  const copy = translations[locale].venue;
+
   return (
     <section className="mx-auto grid w-full max-w-md gap-3 text-left">
       <div className="flex items-center justify-between gap-3 px-1">
         <p className="flex items-center gap-2 text-sm font-semibold text-[#9f101a]">
           <MapPin className="size-4" />
-          婚礼地图
+          {copy.mapHeading}
         </p>
       </div>
 
       {events.map((event, index) => (
-        <VenueMapCard key={event.slug} event={event} markerLabel={String(index + 1)} />
+        <VenueMapCard key={event.slug} event={event} markerLabel={String(index + 1)} locale={locale} />
       ))}
     </section>
   );
 }
 
-function VenueMapCard({ event, markerLabel }: { event: WeddingEvent; markerLabel: string }) {
+function VenueMapCard({ event, markerLabel, locale }: { event: WeddingEvent; markerLabel: string; locale: Locale }) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<AMapMap | null>(null);
   const amapKey = process.env.NEXT_PUBLIC_AMAP_KEY ?? "";
-  const [mapError, setMapError] = useState<string | null>(() =>
-    amapKey ? null : "缺少 NEXT_PUBLIC_AMAP_KEY"
-  );
+  const [mapLoadFailed, setMapLoadFailed] = useState(false);
+  const copy = translations[locale].venue;
+  const venue = getLocalizedVenue(event.slug, locale);
+  const mapError = !amapKey ? copy.missingMapKey : mapLoadFailed ? copy.mapLoadFailed : null;
 
   useEffect(() => {
     const container = mapContainerRef.current;
@@ -299,15 +322,15 @@ function VenueMapCard({ event, markerLabel }: { event: WeddingEvent; markerLabel
 
         const marker = new AMap.Marker({
           position: event.position,
-          title: event.address,
+          title: venue.address,
           offset: new AMap.Pixel(-14, -34),
           content: `<div style="width:28px;height:34px;border-radius:16px 16px 16px 4px;transform:rotate(-45deg);background:#a80f1a;box-shadow:0 10px 24px rgba(128,11,19,.32);border:2px solid #fff4df;display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);color:#fff4df;font-size:13px;font-weight:700;">${markerLabel}</span></div>`,
         });
         marker.setMap(map);
         mapInstanceRef.current = map;
       })
-      .catch((error: unknown) => {
-        setMapError(error instanceof Error ? error.message : "高德地图加载失败");
+      .catch(() => {
+        setMapLoadFailed(true);
       });
 
     return () => {
@@ -315,7 +338,7 @@ function VenueMapCard({ event, markerLabel }: { event: WeddingEvent; markerLabel
       mapInstanceRef.current?.destroy();
       mapInstanceRef.current = null;
     };
-  }, [amapKey, event.address, event.position, markerLabel]);
+  }, [amapKey, event.position, markerLabel, venue.address]);
 
   function focusVenue() {
     mapInstanceRef.current?.setZoomAndCenter(15, event.position);
@@ -327,17 +350,17 @@ function VenueMapCard({ event, markerLabel }: { event: WeddingEvent; markerLabel
         <div className="min-w-0">
           <p className="flex items-center gap-2 text-sm font-semibold text-[#3b1410]">
             <span className="size-2 rounded-full bg-[#a80f1a]" />
-            {event.date} · {event.city}
+            {getDisplayDate(event.isoDate, locale)} · {venue.city}
           </p>
-          <p className="mt-1 text-xs leading-5 text-[#6b3a32]">{event.address}</p>
+          <p className="mt-1 text-xs leading-5 text-[#6b3a32]">{venue.address}</p>
         </div>
         <a
-          href={getAmapNavigationUrl(event)}
+          href={getAmapNavigationUrl(event, locale)}
           target="_blank"
           rel="noreferrer"
           className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-full bg-[#9f101a] px-3 text-xs font-medium text-white transition-all hover:bg-[#7f0b13] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#c31b28]/30"
         >
-          导航
+          {copy.navigate}
           <ExternalLink className="size-3.5" />
         </a>
       </div>
@@ -345,7 +368,7 @@ function VenueMapCard({ event, markerLabel }: { event: WeddingEvent; markerLabel
       <div
         ref={mapContainerRef}
         className="h-56 w-full overflow-hidden rounded-lg bg-[#f2d9d2]"
-        aria-label={`${event.city}婚礼地点地图`}
+        aria-label={copy.mapLabel(venue.city)}
       />
 
       {mapError && <p className="mt-2 text-xs leading-5 text-[#9f101a]">{mapError}</p>}
@@ -355,7 +378,7 @@ function VenueMapCard({ event, markerLabel }: { event: WeddingEvent; markerLabel
         onClick={focusVenue}
         className="mt-3 inline-flex h-8 w-full items-center justify-center rounded-full bg-[#fff8f4]/72 text-xs font-medium text-[#9f101a] transition-all hover:bg-[#f7e5df] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#c31b28]/25"
       >
-        定位到{event.city}地点
+        {copy.focusVenue(venue.city)}
       </button>
     </article>
   );

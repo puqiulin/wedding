@@ -6,7 +6,11 @@ declare global {
   // Next compiles route bundles separately in dev/prod. Keep one PGlite instance
   // per Node process so API writes and page reads see the same embedded database.
   var weddingDbPromise: ReturnType<typeof createDb> | undefined;
+  var weddingDbSchemaPromise: Promise<void> | undefined;
+  var weddingDbSchemaVersion: number | undefined;
 }
+
+const schemaVersion = 4;
 
 const schemaSql = `
 CREATE TABLE IF NOT EXISTS "photos" (
@@ -21,6 +25,14 @@ ALTER TABLE "photos" ADD COLUMN IF NOT EXISTS "file_name" text DEFAULT '' NOT NU
 ALTER TABLE "photos" ADD COLUMN IF NOT EXISTS "file_size" integer DEFAULT 0 NOT NULL;
 
 CREATE TABLE IF NOT EXISTS "music" (
+  "id" serial PRIMARY KEY NOT NULL,
+  "src" text NOT NULL,
+  "file_name" text NOT NULL,
+  "file_size" integer NOT NULL,
+  "created_at" timestamp DEFAULT now() NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS "cover_images" (
   "id" serial PRIMARY KEY NOT NULL,
   "src" text NOT NULL,
   "file_name" text NOT NULL,
@@ -77,7 +89,20 @@ async function createDb() {
   return drizzle({ client, schema });
 }
 
-export function getDb() {
+export async function getDb() {
   globalThis.weddingDbPromise ??= createDb();
-  return globalThis.weddingDbPromise;
+  const db = await globalThis.weddingDbPromise;
+
+  if (globalThis.weddingDbSchemaVersion !== schemaVersion) {
+    globalThis.weddingDbSchemaPromise ??= db.$client.exec(schemaSql)
+      .then(() => {
+        globalThis.weddingDbSchemaVersion = schemaVersion;
+      })
+      .finally(() => {
+        globalThis.weddingDbSchemaPromise = undefined;
+      });
+    await globalThis.weddingDbSchemaPromise;
+  }
+
+  return db;
 }

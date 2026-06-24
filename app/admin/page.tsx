@@ -14,9 +14,10 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   ImagePlus, Music, Trash2, LogOut, RefreshCw, Upload, X,
   CheckCircle2, AlertCircle, Loader2, Globe2, Flag, Monitor, Smartphone,
-  Chrome,
+  Chrome, CircleUserRound, Eye, Users, ChevronsLeft,
+  ChevronLeft, ChevronRight, ChevronsRight,
 } from "lucide-react";
-import type { Photo, Music as MusicType, VisitorLog } from "@/lib/db/schema";
+import type { CoverImage, Photo, Music as MusicType, VisitorLog } from "@/lib/db/schema";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
@@ -98,6 +99,12 @@ type VisitStats = {
   totalViews: number;
   uniqueVisitors: number;
 };
+type VisitPagination = {
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+};
 
 // --- Upload Progress Panel ---
 
@@ -142,7 +149,19 @@ function UploadProgress({ items }: { items: UploadItem[] }) {
 
 // --- Visitor Table ---
 
-function VisitorTable({ visits, stats }: { visits: VisitorLogRow[]; stats: VisitStats }) {
+function VisitorTable({
+  visits,
+  stats,
+  pagination,
+  loading,
+  onPageChange,
+}: {
+  visits: VisitorLogRow[];
+  stats: VisitStats;
+  pagination: VisitPagination;
+  loading: boolean;
+  onPageChange: (page: number) => void;
+}) {
   const flagText = (visit: VisitorLogRow) =>
     [
       visit.isAnonymous && "匿名",
@@ -154,65 +173,93 @@ function VisitorTable({ visits, stats }: { visits: VisitorLogRow[]; stats: Visit
 
   const tableIconClass = "size-3.5 shrink-0 text-muted-foreground";
 
-  return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-0">
-        <div className="flex items-center justify-between border-b px-4 py-3">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <Globe2 className="size-4 text-muted-foreground" />
-            访客信息
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            <span>总浏览 {stats.totalViews}</span>
-            <span>独立访客 {stats.uniqueVisitors}</span>
-            <span>最近 {visits.length} 条</span>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1080px] text-left text-sm">
-            <thead className="bg-muted/50 text-xs text-muted-foreground">
-              <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:font-medium">
-                <th>时间</th>
-                <th>IP</th>
-                <th>
-                  <span className="flex items-center gap-1.5">
-                    <Flag className={tableIconClass} />
-                    国家
-                  </span>
-                </th>
-                <th>ASN</th>
-                <th>
-                  <span className="flex items-center gap-1.5">
-                    <Monitor className={tableIconClass} />
-                    系统
-                  </span>
-                </th>
-                <th>
-                  <span className="flex items-center gap-1.5">
-                    <Chrome className={tableIconClass} />
-                    浏览器
-                  </span>
-                </th>
-                <th>
-                  <span className="flex items-center gap-1.5">
-                    <Smartphone className={tableIconClass} />
-                    设备
-                  </span>
-                </th>
-                <th>风险</th>
-                <th>路径</th>
-                <th>User-Agent</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visits.map((visit) => (
-                (() => {
-                  const countryCode = visit.countryCode || visit.registeredCountryCode;
-                  const countryName = visit.countryName || visit.registeredCountryName;
-                  const countryIcon = countryFlagEmoji(countryCode);
+  const canGoBack = pagination.page > 1;
+  const canGoForward = pagination.page < pagination.totalPages;
 
-                  return (
-                    <tr key={visit.id} className="border-t align-top [&>td]:px-3 [&>td]:py-2">
+  return (
+    <section className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Card size="sm">
+          <CardContent className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs text-muted-foreground">总浏览</p>
+              <p className="mt-1 text-3xl font-semibold tabular-nums">{stats.totalViews}</p>
+            </div>
+            <div className="rounded-lg bg-muted p-2.5 text-muted-foreground">
+              <Eye className="size-5" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card size="sm">
+          <CardContent className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs text-muted-foreground">独立访客</p>
+              <p className="mt-1 text-3xl font-semibold tabular-nums">{stats.uniqueVisitors}</p>
+            </div>
+            <div className="rounded-lg bg-muted p-2.5 text-muted-foreground">
+              <Users className="size-5" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="overflow-hidden" aria-busy={loading}>
+        <CardContent className="p-0">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Globe2 className="size-4 text-muted-foreground" />
+              访客信息
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              {loading && <Loader2 className="size-3.5 animate-spin" />}
+              <span>共 {pagination.totalItems} 条</span>
+            </div>
+          </div>
+          <div className={cn("overflow-x-auto transition-opacity", loading && "opacity-55")}>
+            <table className="w-full min-w-[1080px] text-left text-sm">
+              <thead className="bg-muted/50 text-xs text-muted-foreground">
+                <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:font-medium">
+                  <th>时间</th>
+                  <th>IP</th>
+                  <th>
+                    <span className="flex items-center gap-1.5">
+                      <Flag className={tableIconClass} />
+                      国家
+                    </span>
+                  </th>
+                  <th>ASN</th>
+                  <th>
+                    <span className="flex items-center gap-1.5">
+                      <Monitor className={tableIconClass} />
+                      系统
+                    </span>
+                  </th>
+                  <th>
+                    <span className="flex items-center gap-1.5">
+                      <Chrome className={tableIconClass} />
+                      浏览器
+                    </span>
+                  </th>
+                  <th>
+                    <span className="flex items-center gap-1.5">
+                      <Smartphone className={tableIconClass} />
+                      设备
+                    </span>
+                  </th>
+                  <th>风险</th>
+                  <th>路径</th>
+                  <th>User-Agent</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visits.map((visit) => (
+                  (() => {
+                    const countryCode = visit.countryCode || visit.registeredCountryCode;
+                    const countryName = visit.countryName || visit.registeredCountryName;
+                    const countryIcon = countryFlagEmoji(countryCode);
+
+                    return (
+                      <tr key={visit.id} className="border-t align-top [&>td]:px-3 [&>td]:py-2">
                       <td className="whitespace-nowrap text-muted-foreground">{fmtDate(visit.createdAt)}</td>
                       <td className="whitespace-nowrap font-mono text-xs">{dash(visit.ip)}</td>
                       <td className="whitespace-nowrap">
@@ -262,18 +309,66 @@ function VisitorTable({ visits, stats }: { visits: VisitorLogRow[]; stats: Visit
                       <td className="max-w-[280px] truncate text-xs text-muted-foreground" title={visit.userAgent}>
                         {dash(visit.userAgent)}
                       </td>
-                    </tr>
-                  );
-                })()
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {!visits.length && (
-          <div className="py-10 text-center text-sm text-muted-foreground">暂无访客记录</div>
-        )}
-      </CardContent>
-    </Card>
+                      </tr>
+                    );
+                  })()
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {!visits.length && (
+            <div className="py-10 text-center text-sm text-muted-foreground">暂无访客记录</div>
+          )}
+          <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-muted-foreground">
+              第 {pagination.page} / {pagination.totalPages} 页 · 本页 {visits.length} 条
+            </p>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon-sm"
+                onClick={() => onPageChange(1)}
+                disabled={!canGoBack || loading}
+                aria-label="第一页"
+                title="第一页"
+              >
+                <ChevronsLeft className="size-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                onClick={() => onPageChange(pagination.page - 1)}
+                disabled={!canGoBack || loading}
+                aria-label="上一页"
+                title="上一页"
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                onClick={() => onPageChange(pagination.page + 1)}
+                disabled={!canGoForward || loading}
+                aria-label="下一页"
+                title="下一页"
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                onClick={() => onPageChange(pagination.totalPages)}
+                disabled={!canGoForward || loading}
+                aria-label="最后一页"
+                title="最后一页"
+              >
+                <ChevronsRight className="size-4" />
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </section>
   );
 }
 
@@ -331,10 +426,15 @@ export default function AdminPage() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set());
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
+  const [coverImage, setCoverImage] = useState<CoverImage | null>(null);
   const [musicFile, setMusicFile] = useState<MusicType | null>(null);
   const [visits, setVisits] = useState<VisitorLogRow[]>([]);
   const [visitStats, setVisitStats] = useState<VisitStats>({ totalViews: 0, uniqueVisitors: 0 });
+  const [visitPagination, setVisitPagination] = useState<VisitPagination>({ page: 1, pageSize: 20, totalItems: 0, totalPages: 1 });
+  const [visitsLoading, setVisitsLoading] = useState(false);
   const [musicProgress, setMusicProgress] = useState<number | null>(null);
+  const [coverProgress, setCoverProgress] = useState<number | null>(null);
+  const [deletingCover, setDeletingCover] = useState(false);
   const [deletingMusic, setDeletingMusic] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -347,28 +447,37 @@ export default function AdminPage() {
     setPhotos(await fetch("/api/photos").then((r) => r.json()));
   }, []);
 
-  const fetchVisits = useCallback(async () => {
-    const res = await fetch("/api/visits");
-    if (!res.ok) return;
+  const fetchCoverImage = useCallback(async () => {
+    setCoverImage(await fetch("/api/cover-image").then((r) => r.json()));
+  }, []);
 
-    const data = await res.json();
-    if (Array.isArray(data)) {
-      setVisits(data);
+  const fetchVisits = useCallback(async (page = 1) => {
+    setVisitsLoading(true);
+    try {
+      const res = await fetch(`/api/visits?page=${page}&pageSize=20`);
+      if (!res.ok) return;
+
+      const data = await res.json();
+      setVisits(data.rows ?? []);
       setVisitStats({
-        totalViews: data.length,
-        uniqueVisitors: new Set(data.map((visit) => visit.ip)).size,
+        totalViews: data.stats?.totalViews ?? 0,
+        uniqueVisitors: data.stats?.uniqueVisitors ?? 0,
       });
-      return;
+      setVisitPagination({
+        page: data.pagination?.page ?? page,
+        pageSize: data.pagination?.pageSize ?? 20,
+        totalItems: data.pagination?.totalItems ?? 0,
+        totalPages: data.pagination?.totalPages ?? 1,
+      });
+    } catch {
+      // Keep the current page visible when a refresh fails.
+    } finally {
+      setVisitsLoading(false);
     }
-
-    setVisits(data.rows ?? []);
-    setVisitStats({
-      totalViews: data.stats?.totalViews ?? 0,
-      uniqueVisitors: data.stats?.uniqueVisitors ?? 0,
-    });
   }, []);
 
   useEffect(() => { fetchPhotos(); }, [fetchPhotos]);
+  useEffect(() => { fetchCoverImage(); }, [fetchCoverImage]);
   useEffect(() => { fetchVisits(); }, [fetchVisits]);
   useEffect(() => { fetch("/api/music").then((r) => r.json()).then(setMusicFile); }, []);
 
@@ -418,6 +527,33 @@ export default function AdminPage() {
     e.target.value = "";
   }
 
+  async function handleCoverImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCoverProgress(0);
+    try {
+      const uploaded = await xhrUpload(file, "cover", setCoverProgress);
+      const image = await fetch("/api/cover-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(uploaded),
+      }).then((r) => r.json());
+      setCoverImage(image);
+    } catch { /* noop */ }
+    setCoverProgress(null);
+    e.target.value = "";
+  }
+
+  async function deleteCoverImage() {
+    setDeletingCover(true);
+    try {
+      await fetch("/api/cover-image", { method: "DELETE" });
+      setCoverImage(null);
+    } finally {
+      setDeletingCover(false);
+    }
+  }
+
   async function deleteMusic() {
     setDeletingMusic(true);
     try {
@@ -457,7 +593,7 @@ export default function AdminPage() {
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
           <h1 className="text-lg font-semibold tracking-tight">后台管理</h1>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon-sm" onClick={() => { fetchPhotos(); fetchVisits(); }} aria-label="刷新">
+            <Button variant="ghost" size="icon-sm" onClick={() => { fetchPhotos(); fetchCoverImage(); fetchVisits(visitPagination.page); }} aria-label="刷新">
               <RefreshCw className="size-4" />
             </Button>
             <Button variant="ghost" size="sm" onClick={() => { fetch("/api/auth/logout", { method: "POST" }); router.push("/admin/login"); }}>
@@ -468,8 +604,73 @@ export default function AdminPage() {
       </header>
 
       <main className="mx-auto max-w-5xl space-y-6 p-4 pt-6">
-        {/* Music + Upload row */}
-        <div className="grid gap-4 sm:grid-cols-2">
+        {/* Main asset controls */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Cover image card */}
+          <Card className="overflow-hidden">
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <CircleUserRound className="size-4 text-muted-foreground" />
+                封面头像
+              </div>
+              <div className={cn("flex items-center gap-3 rounded-lg bg-muted/50 p-3", deletingCover && "pointer-events-none opacity-50")}>
+                <Image
+                  src={coverImage?.src ?? "/sprite.jpg"}
+                  alt="当前封面头像"
+                  width={64}
+                  height={64}
+                  className="size-16 shrink-0 rounded-full object-cover ring-2 ring-background"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm">{coverImage?.fileName ?? "默认封面"}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {coverImage ? fmt(coverImage.fileSize) : "未单独配置"}
+                  </p>
+                </div>
+                {coverImage && (
+                  deletingCover ? (
+                    <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
+                  ) : (
+                    <AlertDialog>
+                      <AlertDialogTrigger render={<Button variant="ghost" size="icon-sm" aria-label="恢复默认封面" />}>
+                        <Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>恢复默认封面？</AlertDialogTitle>
+                          <AlertDialogDescription>当前上传的封面图片将被删除。</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>取消</AlertDialogCancel>
+                          <AlertDialogAction onClick={deleteCoverImage}>恢复默认</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )
+                )}
+              </div>
+              <label
+                className={cn(
+                  "block w-full cursor-pointer rounded-lg border-2 border-dashed py-10 text-center transition-colors hover:border-primary/40 hover:bg-muted/30",
+                  coverProgress !== null && "pointer-events-none opacity-50",
+                )}
+              >
+                <Upload className="mx-auto mb-2 size-8 text-muted-foreground/50" />
+                <p className="text-sm text-muted-foreground">
+                  {coverProgress !== null ? "上传中..." : coverImage ? "点击替换封面头像" : "点击选择封面头像"}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground/60">支持 JPG、PNG、WebP</p>
+                <input type="file" accept="image/*" onChange={handleCoverImage} className="hidden" disabled={coverProgress !== null} />
+              </label>
+              {coverProgress !== null && (
+                <div className="space-y-1">
+                  <Progress value={coverProgress} className="h-1.5" />
+                  <p className="text-right text-xs text-muted-foreground">{coverProgress}%</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Music card */}
           <Card className="overflow-hidden">
             <CardContent className="p-4 space-y-3">
@@ -506,17 +707,25 @@ export default function AdminPage() {
               ) : (
                 <p className="text-sm text-muted-foreground">未设置</p>
               )}
+              <label
+                className={cn(
+                  "block w-full cursor-pointer rounded-lg border-2 border-dashed py-10 text-center transition-colors hover:border-primary/40 hover:bg-muted/30",
+                  musicProgress !== null && "pointer-events-none opacity-50",
+                )}
+              >
+                <Upload className="mx-auto mb-2 size-8 text-muted-foreground/50" />
+                <p className="text-sm text-muted-foreground">
+                  {musicProgress !== null ? "上传中..." : musicFile ? "点击替换背景音乐" : "点击选择背景音乐"}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground/60">支持 MP3、M4A、WAV</p>
+                <input type="file" accept="audio/*" onChange={handleMusic} className="hidden" disabled={musicProgress !== null} />
+              </label>
               {musicProgress !== null && (
                 <div className="space-y-1">
                   <Progress value={musicProgress} className="h-1.5" />
-                  <p className="text-xs text-muted-foreground text-right">{musicProgress}%</p>
+                  <p className="text-right text-xs text-muted-foreground">{musicProgress}%</p>
                 </div>
               )}
-              <label className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full cursor-pointer gap-1.5")}>
-                <Upload className="size-3.5" />
-                {musicProgress !== null ? "上传中..." : "选择音乐文件"}
-                <input type="file" accept="audio/*" onChange={handleMusic} className="hidden" disabled={musicProgress !== null} />
-              </label>
             </CardContent>
           </Card>
 
@@ -569,7 +778,13 @@ export default function AdminPage() {
           )}
         </div>
 
-        <VisitorTable visits={visits} stats={visitStats} />
+        <VisitorTable
+          visits={visits}
+          stats={visitStats}
+          pagination={visitPagination}
+          loading={visitsLoading}
+          onPageChange={fetchVisits}
+        />
       </main>
     </div>
   );
