@@ -67,7 +67,7 @@ jobs:
             set -euo pipefail
 
             APP_DIR=/opt/wedding
-            mkdir -p "$APP_DIR/data/pglite" "$APP_DIR/public/album" "$APP_DIR/public/music"
+            mkdir -p "$APP_DIR/data/pglite" "$APP_DIR/public/album" "$APP_DIR/public/cover" "$APP_DIR/public/music"
             chown -R 100:101 "$APP_DIR"
 
             if ! command -v docker >/dev/null 2>&1; then
@@ -78,6 +78,11 @@ jobs:
 
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             docker pull "$IMAGE_NAME:latest"
+
+            if docker inspect wedding >/dev/null 2>&1; then
+              docker cp wedding:/app/public/cover/. "$APP_DIR/public/cover/" 2>/dev/null || true
+              chown -R 100:101 "$APP_DIR/public/cover"
+            fi
 
             docker rm -f wedding || true
             docker run -d \
@@ -92,6 +97,7 @@ jobs:
               -e MAXMIND_DB_PATH=/app/data/ip66.mmdb \
               -v "$APP_DIR/data/pglite:/app/data/pglite" \
               -v "$APP_DIR/public/album:/app/public/album" \
+              -v "$APP_DIR/public/cover:/app/public/cover" \
               -v "$APP_DIR/public/music:/app/public/music" \
               "$IMAGE_NAME:latest"
 

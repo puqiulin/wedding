@@ -12,9 +12,10 @@ bun dev
 
 The app uses PGlite instead of an external Postgres service. By default the embedded database is stored at `./data/pglite`; override it with `PGLITE_DATA_DIR`.
 
-Album images and background music are served directly from `public`:
+Uploaded assets are served from `public`:
 
 - photos: `public/album`
+- cover image: `public/cover`
 - music: `public/music`
 
 The admin upload API writes files into those directories and stores their public paths in PGlite.
@@ -41,6 +42,7 @@ docker run --rm -p 3000:3000 \
   -e PGLITE_DATA_DIR=/app/data/pglite \
   -v "$PWD/data/pglite:/app/data/pglite" \
   -v "$PWD/public/album:/app/public/album" \
+  -v "$PWD/public/cover:/app/public/cover" \
   -v "$PWD/public/music:/app/public/music" \
   wedding
 ```

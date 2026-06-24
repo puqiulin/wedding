@@ -25,7 +25,7 @@ ENV PGLITE_DATA_DIR=/app/data/pglite
 
 RUN addgroup -S nodejs \
   && adduser -S nextjs -G nodejs \
-  && mkdir -p /app/data /app/public/album /app/public/music \
+  && mkdir -p /app/data /app/public/album /app/public/cover /app/public/music \
   && chown -R nextjs:nodejs /app
 
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
