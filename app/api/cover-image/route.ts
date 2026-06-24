@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { coverImages } from "@/lib/db/schema";
-import { deletePublicAsset } from "@/lib/public-assets";
+import { deletePublicAsset, publicAssetExists } from "@/lib/public-assets";
 
 export async function GET() {
   const db = await getDb();
   const rows = await db.select().from(coverImages).limit(1);
-  return NextResponse.json(rows[0] ?? null);
+  const coverImage = rows[0];
+  return NextResponse.json(
+    coverImage && await publicAssetExists(coverImage.src) ? coverImage : null
+  );
 }
 
 export async function POST(req: NextRequest) {

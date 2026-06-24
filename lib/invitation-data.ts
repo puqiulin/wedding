@@ -1,6 +1,7 @@
 import { asc } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { coverImages, music, photos } from "@/lib/db/schema";
+import { publicAssetExists } from "@/lib/public-assets";
 
 export type GalleryPhoto = {
   id: number;
@@ -15,10 +16,14 @@ export async function getInvitationData() {
     db.select().from(music).limit(1),
     db.select().from(coverImages).limit(1),
   ]);
+  const configuredCoverSrc = coverRows[0]?.src;
+  const coverSrc = configuredCoverSrc && await publicAssetExists(configuredCoverSrc)
+    ? configuredCoverSrc
+    : "/sprite.jpg";
 
   return {
     bgmSrc: musicRows[0]?.src ?? undefined,
-    coverSrc: coverRows[0]?.src ?? "/sprite.jpg",
+    coverSrc,
     photos: rows.map((photo) => ({
       id: photo.id,
       src: photo.src,

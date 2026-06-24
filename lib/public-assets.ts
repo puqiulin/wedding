@@ -55,6 +55,22 @@ export async function deletePublicAsset(src: string) {
   await fs.rm(resolvePublicAsset(src), { force: true });
 }
 
+export async function publicAssetExists(src: string) {
+  if (!src.startsWith("/album/") && !src.startsWith("/cover/") && !src.startsWith("/music/")) {
+    return false;
+  }
+
+  try {
+    await fs.access(resolvePublicAsset(src));
+    return true;
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      return false;
+    }
+    throw error;
+  }
+}
+
 export async function readPublicAsset(src: string) {
   if (!src.startsWith("/album/") && !src.startsWith("/cover/") && !src.startsWith("/music/")) {
     return null;
