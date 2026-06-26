@@ -235,14 +235,32 @@ function LanguageSwitcher({
 function SiteFooter() {
   return (
     <footer className="relative border-t border-[#d7837d]/15 bg-[#fff8f4] px-6 py-6 text-center text-xs text-[#8a554d]">
-      <a
-        href="https://beian.miit.gov.cn/"
-        target="_blank"
-        rel="noreferrer"
-        className="transition-colors hover:text-[#9f101a]"
-      >
-        蜀ICP备2026033844号-1
-      </a>
+      <div className="flex flex-col items-center justify-center gap-2 sm:flex-row sm:gap-4">
+        <a
+          href="https://beian.miit.gov.cn/"
+          target="_blank"
+          rel="noreferrer"
+          className="transition-colors hover:text-[#9f101a]"
+        >
+          蜀ICP备2026033844号-1
+        </a>
+        <a
+          href="https://beian.mps.gov.cn/#/query/webSearch?code=51012402001727"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center justify-center gap-1.5 transition-colors hover:text-[#9f101a]"
+        >
+          <Image
+            src="/beian-police.png"
+            alt=""
+            width={16}
+            height={17}
+            className="h-[17px] w-4 shrink-0 object-contain"
+            aria-hidden="true"
+          />
+          川公网安备51012402001727号
+        </a>
+      </div>
     </footer>
   );
 }
