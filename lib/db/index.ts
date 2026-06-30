@@ -1,11 +1,13 @@
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
+import { promises as fs } from "fs";
+import path from "path";
 import * as schema from "./schema";
 
 declare global {
   // Next compiles route bundles separately in dev/prod. Keep one PGlite instance
   // per Node process so API writes and page reads see the same embedded database.
-  var weddingDbPromise: ReturnType<typeof createDb> | undefined;
+  var weddingDbPromise: ReturnType<typeof createReadyDb> | undefined;
   var weddingDbSchemaPromise: Promise<void> | undefined;
   var weddingDbSchemaVersion: number | undefined;
 }
@@ -82,27 +84,109 @@ CREATE TABLE IF NOT EXISTS "visitor_logs" (
 );
 `;
 
+function resolveNodeDataDir(dataDir: string) {
+  if (dataDir.startsWith("memory://") || dataDir.startsWith("idb://") || dataDir.startsWith("opfs-ahp://")) {
+    return null;
+  }
+  return path.resolve(dataDir.startsWith("file://") ? dataDir.slice(7) : dataDir);
+}
+
+function isProcessRunning(pid: number) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error instanceof Error && "code" in error && error.code === "EPERM";
+  }
+}
+
+async function removeStalePglitePid(dataDir: string) {
+  const nodeDataDir = resolveNodeDataDir(dataDir);
+  if (!nodeDataDir) return;
+
+  const pidFile = path.join(nodeDataDir, "postmaster.pid");
+  let contents: string;
+  try {
+    contents = await fs.readFile(pidFile, "utf8");
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return;
+    throw error;
+  }
+
+  const pid = Number.parseInt(contents.split(/\r?\n/, 1)[0] ?? "", 10);
+  if (!isProcessRunning(pid)) {
+    await fs.rm(pidFile, { force: true });
+  }
+}
+
+function isPgliteAbort(error: unknown) {
+  return error instanceof Error && error.message.includes("Aborted()");
+}
+
+async function backupBrokenPgliteDataDir(dataDir: string) {
+  const nodeDataDir = resolveNodeDataDir(dataDir);
+  if (!nodeDataDir) return false;
+
+  try {
+    await fs.stat(nodeDataDir);
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return false;
+    throw error;
+  }
+
+  const backupDir = `${nodeDataDir}.broken-${Date.now()}`;
+  await fs.rename(nodeDataDir, backupDir);
+  console.error(`PGlite startup aborted; moved broken data directory to ${backupDir}`);
+  return true;
+}
+
 async function createDb() {
   const dataDir = process.env.PGLITE_DATA_DIR ?? "./data/pglite";
+  await removeStalePglitePid(dataDir);
   const client = new PGlite(dataDir);
-  await client.exec(schemaSql);
   return drizzle({ client, schema });
 }
 
-export async function getDb() {
-  globalThis.weddingDbPromise ??= createDb();
-  const db = await globalThis.weddingDbPromise;
+async function ensureSchema(db: Awaited<ReturnType<typeof createDb>>) {
+  if (globalThis.weddingDbSchemaVersion === schemaVersion) return;
 
-  if (globalThis.weddingDbSchemaVersion !== schemaVersion) {
-    globalThis.weddingDbSchemaPromise ??= db.$client.exec(schemaSql)
-      .then(() => {
-        globalThis.weddingDbSchemaVersion = schemaVersion;
-      })
-      .finally(() => {
-        globalThis.weddingDbSchemaPromise = undefined;
-      });
-    await globalThis.weddingDbSchemaPromise;
+  globalThis.weddingDbSchemaPromise ??= db.$client.exec(schemaSql)
+    .then(() => {
+      globalThis.weddingDbSchemaVersion = schemaVersion;
+    })
+    .finally(() => {
+      globalThis.weddingDbSchemaPromise = undefined;
+    });
+  await globalThis.weddingDbSchemaPromise;
+}
+
+async function createReadyDb(recoverOnAbort = true) {
+  const dataDir = process.env.PGLITE_DATA_DIR ?? "./data/pglite";
+  try {
+    const db = await createDb();
+    await ensureSchema(db);
+    return db;
+  } catch (error) {
+    globalThis.weddingDbSchemaPromise = undefined;
+    globalThis.weddingDbSchemaVersion = undefined;
+
+    if (recoverOnAbort && isPgliteAbort(error) && await backupBrokenPgliteDataDir(dataDir)) {
+      return createReadyDb(false);
+    }
+
+    throw error;
   }
+}
 
-  return db;
+export async function getDb() {
+  globalThis.weddingDbPromise ??= createReadyDb().catch((error) => {
+    globalThis.weddingDbPromise = undefined;
+    globalThis.weddingDbSchemaPromise = undefined;
+    globalThis.weddingDbSchemaVersion = undefined;
+    throw error;
+  });
+
+  return globalThis.weddingDbPromise;
 }

@@ -18,6 +18,7 @@ import {
   ChevronLeft, ChevronRight, ChevronsRight,
 } from "lucide-react";
 import type { CoverImage, Photo, Music as MusicType, VisitorLog } from "@/lib/db/schema";
+import { MAX_ALBUM_PHOTOS } from "@/lib/album";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
@@ -62,7 +63,7 @@ type UploadedAsset = {
   fileSize: number;
 };
 
-function xhrUpload(file: File, folder: string | undefined, onProgress: (p: number) => void) {
+function xhrUpload(file: File, folder: "album" | "cover" | "music", onProgress: (p: number) => void) {
   return new Promise<UploadedAsset>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.upload.onprogress = (e) => {
@@ -81,7 +82,7 @@ function xhrUpload(file: File, folder: string | undefined, onProgress: (p: numbe
 
     const formData = new FormData();
     formData.append("file", file);
-    if (folder) formData.append("folder", folder);
+    formData.append("folder", folder);
 
     xhr.send(formData);
   });
@@ -484,22 +485,34 @@ export default function AdminPage() {
   async function handlePhotos(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files?.length) return;
-    const items: UploadItem[] = Array.from(files).map((f) => ({
-      name: f.name, size: f.size, progress: 0, status: "uploading",
+    const remainingSlots = Math.max(0, MAX_ALBUM_PHOTOS - photos.length);
+    const selectedFiles = Array.from(files);
+    const uploadableFiles = selectedFiles.slice(0, remainingSlots);
+    const items: UploadItem[] = selectedFiles.map((f, index) => ({
+      name: f.name,
+      size: f.size,
+      progress: index < remainingSlots ? 0 : 100,
+      status: index < remainingSlots ? "uploading" : "error",
     }));
     setUploadItems(items);
+    if (!uploadableFiles.length) {
+      e.target.value = "";
+      setTimeout(() => setUploadItems([]), 3000);
+      return;
+    }
 
     const update = (idx: number, patch: Partial<UploadItem>) =>
       setUploadItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
 
-    for (let i = 0; i < files.length; i++) {
+    for (let i = 0; i < uploadableFiles.length; i++) {
       try {
-        const uploaded = await xhrUpload(files[i], undefined, (p) => update(i, { progress: p }));
-        await fetch("/api/photos", {
+        const uploaded = await xhrUpload(uploadableFiles[i], "album", (p) => update(i, { progress: p }));
+        const res = await fetch("/api/photos", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ src: uploaded.src, alt: "", fileName: uploaded.fileName, fileSize: uploaded.fileSize }),
         });
+        if (!res.ok) throw new Error("Failed to save photo");
         update(i, { progress: 100, status: "done" });
       } catch {
         update(i, { status: "error" });
@@ -585,6 +598,7 @@ export default function AdminPage() {
   }
 
   const uploading = uploadItems.some((i) => i.status === "uploading");
+  const canUploadMorePhotos = photos.length < MAX_ALBUM_PHOTOS;
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -738,14 +752,18 @@ export default function AdminPage() {
               </div>
               <button
                 onClick={() => photoInputRef.current?.click()}
-                disabled={uploading}
+                disabled={uploading || !canUploadMorePhotos}
                 className="w-full rounded-lg border-2 border-dashed py-10 text-center transition-colors hover:border-primary/40 hover:bg-muted/30 disabled:opacity-50"
               >
                 <Upload className="mx-auto size-8 text-muted-foreground/50 mb-2" />
-                <p className="text-sm text-muted-foreground">{uploading ? "上传中..." : "点击选择或拖入照片"}</p>
-                <p className="text-xs text-muted-foreground/60 mt-1">支持多选</p>
+                <p className="text-sm text-muted-foreground">
+                  {uploading ? "上传中..." : canUploadMorePhotos ? "点击选择或拖入照片" : "已达到15张上限"}
+                </p>
+                <p className="text-xs text-muted-foreground/60 mt-1">
+                  已上传 {photos.length}/{MAX_ALBUM_PHOTOS}，支持多选
+                </p>
               </button>
-              <input ref={photoInputRef} type="file" accept="image/*" multiple onChange={handlePhotos} className="hidden" disabled={uploading} />
+              <input ref={photoInputRef} type="file" accept="image/*" multiple onChange={handlePhotos} className="hidden" disabled={uploading || !canUploadMorePhotos} />
             </CardContent>
           </Card>
         </div>
@@ -757,7 +775,7 @@ export default function AdminPage() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-medium text-muted-foreground">
-              全部照片 ({photos.length})
+              全部照片 ({photos.length}/{MAX_ALBUM_PHOTOS})
             </h2>
             <p className="text-xs text-muted-foreground">拖拽排序</p>
           </div>

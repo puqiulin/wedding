@@ -15,6 +15,7 @@
 
 # local embedded database
 /data/pglite/
+/data/pglite.broken-*/
 
 # next.js
 /.next/

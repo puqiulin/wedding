@@ -11,6 +11,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "file is required" }, { status: 400 });
   }
 
-  const asset = await savePublicAsset(file, formData.get("folder"));
-  return NextResponse.json(asset, { status: 201 });
+  try {
+    const asset = await savePublicAsset(file, formData.get("folder"));
+    return NextResponse.json(asset, { status: 201 });
+  } catch (error) {
+    if (error instanceof Error && error.message === "Unsupported upload folder") {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    throw error;
+  }
 }

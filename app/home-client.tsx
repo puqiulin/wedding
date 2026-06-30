@@ -332,7 +332,7 @@ function AlbumGallery({ photos, bgmSrc, locale }: { photos: GalleryPhoto[]; bgmS
         {photos.map((photo, index) => {
           const storyIndex = index % copy.stories.length;
           const story = copy.stories[storyIndex];
-          const storyMode = galleryStoryModes[storyIndex];
+          const storyMode = galleryStoryModes[storyIndex % galleryStoryModes.length];
           const isIntro = index === 0;
           const isOverlay = storyMode === "overlay";
           const isReversed = index % 2 === 1;

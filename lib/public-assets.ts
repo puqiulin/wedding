@@ -6,11 +6,10 @@ const publicRoot = path.join(process.cwd(), "public");
 const allowedFolders = new Set(["album", "cover", "music"]);
 
 function normalizeFolder(folder: unknown) {
-  const value = typeof folder === "string" && folder ? folder : "album";
-  if (!allowedFolders.has(value)) {
+  if (typeof folder !== "string" || !allowedFolders.has(folder)) {
     throw new Error("Unsupported upload folder");
   }
-  return value;
+  return folder;
 }
 
 function safeFileName(fileName: string) {
