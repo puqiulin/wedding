@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
@@ -14,7 +15,7 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   ImagePlus, Music, Trash2, LogOut, RefreshCw, Upload, X,
   CheckCircle2, AlertCircle, Loader2, Globe2, Flag, Monitor, Smartphone,
-  Chrome, CircleUserRound, Eye, Users, ChevronsLeft,
+  Chrome, Database, CircleUserRound, Eye, Users, ChevronsLeft,
   ChevronLeft, ChevronRight, ChevronsRight,
 } from "lucide-react";
 import type { CoverImage, Photo, Music as MusicType, VisitorLog } from "@/lib/db/schema";
@@ -99,6 +100,7 @@ type VisitorLogRow = Omit<VisitorLog, "createdAt"> & { createdAt: string };
 type VisitStats = {
   totalViews: number;
   uniqueVisitors: number;
+  distinctCountries: number;
 };
 type VisitPagination = {
   page: number;
@@ -179,7 +181,7 @@ function VisitorTable({
 
   return (
     <section className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-3">
         <Card size="sm">
           <CardContent className="flex items-center justify-between gap-3">
             <div>
@@ -199,6 +201,17 @@ function VisitorTable({
             </div>
             <div className="rounded-lg bg-muted p-2.5 text-muted-foreground">
               <Users className="size-5" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card size="sm">
+          <CardContent className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs text-muted-foreground">国家/地区</p>
+              <p className="mt-1 text-3xl font-semibold tabular-nums">{stats.distinctCountries}</p>
+            </div>
+            <div className="rounded-lg bg-muted p-2.5 text-muted-foreground">
+              <Globe2 className="size-5" />
             </div>
           </CardContent>
         </Card>
@@ -430,7 +443,7 @@ export default function AdminPage() {
   const [coverImage, setCoverImage] = useState<CoverImage | null>(null);
   const [musicFile, setMusicFile] = useState<MusicType | null>(null);
   const [visits, setVisits] = useState<VisitorLogRow[]>([]);
-  const [visitStats, setVisitStats] = useState<VisitStats>({ totalViews: 0, uniqueVisitors: 0 });
+  const [visitStats, setVisitStats] = useState<VisitStats>({ totalViews: 0, uniqueVisitors: 0, distinctCountries: 0 });
   const [visitPagination, setVisitPagination] = useState<VisitPagination>({ page: 1, pageSize: 20, totalItems: 0, totalPages: 1 });
   const [visitsLoading, setVisitsLoading] = useState(false);
   const [musicProgress, setMusicProgress] = useState<number | null>(null);
@@ -463,6 +476,7 @@ export default function AdminPage() {
       setVisitStats({
         totalViews: data.stats?.totalViews ?? 0,
         uniqueVisitors: data.stats?.uniqueVisitors ?? 0,
+        distinctCountries: data.stats?.distinctCountries ?? 0,
       });
       setVisitPagination({
         page: data.pagination?.page ?? page,
@@ -607,6 +621,10 @@ export default function AdminPage() {
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
           <h1 className="text-lg font-semibold tracking-tight">后台管理</h1>
           <div className="flex items-center gap-1">
+            <Link href="/admin/db" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "gap-1.5")}>
+              <Database className="size-3.5" />
+              数据库
+            </Link>
             <Button variant="ghost" size="icon-sm" onClick={() => { fetchPhotos(); fetchCoverImage(); fetchVisits(visitPagination.page); }} aria-label="刷新">
               <RefreshCw className="size-4" />
             </Button>

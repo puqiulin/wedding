@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { count, countDistinct, desc } from "drizzle-orm";
+import { count, countDistinct, desc, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { visitorLogs } from "@/lib/db/schema";
 import { getVisitorInfo } from "@/lib/visitor-info";
@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
       .select({
         totalViews: count(),
         uniqueVisitors: countDistinct(visitorLogs.ip),
+        distinctCountries: sql<number>`count(distinct nullif(${visitorLogs.countryCode}, ''))`,
       })
       .from(visitorLogs),
   ]);
@@ -43,6 +44,7 @@ export async function GET(req: NextRequest) {
     stats: {
       totalViews,
       uniqueVisitors: Number(totals[0]?.uniqueVisitors ?? 0),
+      distinctCountries: Number(totals[0]?.distinctCountries ?? 0),
     },
     pagination: {
       page,
