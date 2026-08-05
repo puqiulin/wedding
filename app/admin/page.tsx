@@ -16,7 +16,7 @@ import {
   ImagePlus, Music, Trash2, LogOut, RefreshCw, Upload, X,
   CheckCircle2, AlertCircle, Loader2, Globe2, Flag, Monitor, Smartphone,
   Chrome, Database, CircleUserRound, Eye, Users, ChevronsLeft,
-  ChevronLeft, ChevronRight, ChevronsRight,
+  ChevronLeft, ChevronRight, ChevronsRight, Check, ListChecks,
 } from "lucide-react";
 import type { CoverImage, Photo, Music as MusicType, VisitorLog } from "@/lib/db/schema";
 import { MAX_ALBUM_PHOTOS } from "@/lib/album";
@@ -388,30 +388,72 @@ function VisitorTable({
 
 // --- Sortable Photo ---
 
-function SortablePhoto({ photo, onDelete, deleting }: { photo: Photo; onDelete: (id: number) => void; deleting: boolean }) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: photo.id });
+function SortablePhoto({
+  photo,
+  onDelete,
+  deleting,
+  selecting,
+  selected,
+  onToggle,
+}: {
+  photo: Photo;
+  onDelete: (id: number) => void;
+  deleting: boolean;
+  selecting: boolean;
+  selected: boolean;
+  onToggle: (id: number) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: photo.id, disabled: selecting });
   const [dialogOpen, setDialogOpen] = useState(false);
   return (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={cn("group relative rounded-xl bg-muted", deleting && "opacity-50 pointer-events-none")}
+      className={cn(
+        "group relative rounded-xl bg-muted ring-offset-2 ring-offset-background transition-shadow",
+        selected && "ring-2 ring-primary",
+        deleting && "opacity-50 pointer-events-none",
+      )}
     >
       {deleting && (
         <div className="absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-black/30">
           <Loader2 className="size-6 text-white animate-spin" />
         </div>
       )}
-      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing touch-none rounded-xl overflow-hidden">
-        <Image src={photo.src} alt={photo.alt} width={200} height={200}
-          className="w-full aspect-square object-cover transition-transform group-hover:scale-[1.02] pointer-events-none select-none [-webkit-touch-callout:none]" draggable={false} />
-      </div>
+      {selecting ? (
+        <button
+          type="button"
+          onClick={() => onToggle(photo.id)}
+          className="block w-full overflow-hidden rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label={`${selected ? "取消选择" : "选择"}照片 ${photo.fileName || photo.id}`}
+          aria-pressed={selected}
+        >
+          <Image src={photo.src} alt={photo.alt} width={200} height={200}
+            className={cn("w-full aspect-square object-cover transition-all pointer-events-none select-none", selected && "brightness-75")} draggable={false} />
+        </button>
+      ) : (
+        <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing touch-none rounded-xl overflow-hidden">
+          <Image src={photo.src} alt={photo.alt} width={200} height={200}
+            className="w-full aspect-square object-cover transition-transform group-hover:scale-[1.02] pointer-events-none select-none [-webkit-touch-callout:none]" draggable={false} />
+        </div>
+      )}
+      {selecting && (
+        <span
+          className={cn(
+            "pointer-events-none absolute right-2 top-2 z-10 flex size-6 items-center justify-center rounded-full border-2 border-white bg-black/35 text-white shadow-sm",
+            selected && "border-primary bg-primary",
+          )}
+          aria-hidden="true"
+        >
+          {selected && <Check className="size-4" />}
+        </span>
+      )}
       {photo.fileSize > 0 && (
         <span className="absolute bottom-1.5 left-1.5 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] text-white/80">
           {fmt(photo.fileSize)}
         </span>
       )}
-      <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      {!selecting && <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <AlertDialogTrigger
           render={
             <button className="absolute top-1.5 right-1.5 z-10 rounded-full bg-black/50 p-1.5 text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:bg-destructive" />
@@ -429,7 +471,7 @@ function SortablePhoto({ photo, onDelete, deleting }: { photo: Photo; onDelete: 
             <AlertDialogAction onClick={() => { setDialogOpen(false); onDelete(photo.id); }}>删除</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
-      </AlertDialog>
+      </AlertDialog>}
     </div>
   );
 }
@@ -439,6 +481,9 @@ function SortablePhoto({ photo, onDelete, deleting }: { photo: Photo; onDelete: 
 export default function AdminPage() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set());
+  const [selectingPhotos, setSelectingPhotos] = useState(false);
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<number>>(new Set());
+  const [photoDeleteError, setPhotoDeleteError] = useState("");
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
   const [coverImage, setCoverImage] = useState<CoverImage | null>(null);
   const [musicFile, setMusicFile] = useState<MusicType | null>(null);
@@ -592,10 +637,58 @@ export default function AdminPage() {
   }
 
   async function deletePhoto(id: number) {
+    setPhotoDeleteError("");
     setDeletingIds((s) => new Set(s).add(id));
-    await fetch(`/api/photos/${id}`, { method: "DELETE" });
-    setPhotos((p) => p.filter((x) => x.id !== id));
-    setDeletingIds((s) => { const n = new Set(s); n.delete(id); return n; });
+    try {
+      const response = await fetch(`/api/photos/${id}`, { method: "DELETE" });
+      if (!response.ok) throw new Error("Failed to delete photo");
+      setPhotos((p) => p.filter((x) => x.id !== id));
+      setSelectedPhotoIds((ids) => { const next = new Set(ids); next.delete(id); return next; });
+    } catch {
+      setPhotoDeleteError("删除失败，请稍后重试。");
+    } finally {
+      setDeletingIds((s) => { const n = new Set(s); n.delete(id); return n; });
+    }
+  }
+
+  function togglePhotoSelection(id: number) {
+    setSelectedPhotoIds((ids) => {
+      const next = new Set(ids);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function cancelPhotoSelection() {
+    setSelectingPhotos(false);
+    setSelectedPhotoIds(new Set());
+    setPhotoDeleteError("");
+  }
+
+  async function deleteSelectedPhotos() {
+    const ids = [...selectedPhotoIds];
+    if (!ids.length) return;
+
+    setPhotoDeleteError("");
+    setDeletingIds(new Set(ids));
+    try {
+      const response = await fetch("/api/photos", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      if (!response.ok) throw new Error("Failed to delete photos");
+
+      const deletedIds = new Set<number>((await response.json()).deletedIds ?? ids);
+      setPhotos((current) => current.filter((photo) => !deletedIds.has(photo.id)));
+      setSelectedPhotoIds(new Set());
+      setSelectingPhotos(false);
+    } catch {
+      setPhotoDeleteError("批量删除失败，请稍后重试。");
+    } finally {
+      setDeletingIds(new Set());
+    }
   }
 
   async function handleDragEnd({ active, over }: DragEndEvent) {
@@ -613,6 +706,7 @@ export default function AdminPage() {
 
   const uploading = uploadItems.some((i) => i.status === "uploading");
   const canUploadMorePhotos = photos.length < MAX_ALBUM_PHOTOS;
+  const allPhotosSelected = photos.length > 0 && selectedPhotoIds.size === photos.length;
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -791,17 +885,71 @@ export default function AdminPage() {
 
         {/* Photo grid */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-medium text-muted-foreground">
-              全部照片 ({photos.length}/{MAX_ALBUM_PHOTOS})
-            </h2>
-            <p className="text-xs text-muted-foreground">拖拽排序</p>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-medium text-muted-foreground">
+                全部照片 ({photos.length}/{MAX_ALBUM_PHOTOS})
+              </h2>
+              {photoDeleteError && <p className="mt-1 text-xs text-destructive" role="alert">{photoDeleteError}</p>}
+            </div>
+            {selectingPhotos ? (
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <span className="text-xs text-muted-foreground">已选 {selectedPhotoIds.size} 张</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedPhotoIds(allPhotosSelected ? new Set() : new Set(photos.map((photo) => photo.id)))}
+                >
+                  {allPhotosSelected ? "取消全选" : "全选"}
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger
+                    render={<Button variant="destructive" size="sm" disabled={!selectedPhotoIds.size || deletingIds.size > 0} />}
+                  >
+                    {deletingIds.size > 0 ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+                    删除 ({selectedPhotoIds.size})
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>删除选中的 {selectedPhotoIds.size} 张照片？</AlertDialogTitle>
+                      <AlertDialogDescription>照片文件和数据库记录都会被永久删除，此操作不可撤销。</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>取消</AlertDialogCancel>
+                      <AlertDialogAction onClick={deleteSelectedPhotos}>确认删除</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <Button variant="ghost" size="sm" onClick={cancelPhotoSelection} disabled={deletingIds.size > 0}>完成</Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-muted-foreground">拖拽排序</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setSelectingPhotos(true); setPhotoDeleteError(""); }}
+                  disabled={!photos.length}
+                >
+                  <ListChecks className="size-3.5" />
+                  批量删除
+                </Button>
+              </div>
+            )}
           </div>
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={photos.map((p) => p.id)} strategy={rectSortingStrategy}>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {photos.map((photo) => (
-                  <SortablePhoto key={photo.id} photo={photo} onDelete={deletePhoto} deleting={deletingIds.has(photo.id)} />
+                  <SortablePhoto
+                    key={photo.id}
+                    photo={photo}
+                    onDelete={deletePhoto}
+                    deleting={deletingIds.has(photo.id)}
+                    selecting={selectingPhotos}
+                    selected={selectedPhotoIds.has(photo.id)}
+                    onToggle={togglePhotoSelection}
+                  />
                 ))}
               </div>
             </SortableContext>
