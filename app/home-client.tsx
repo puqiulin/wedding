@@ -350,7 +350,7 @@ function AlbumGallery({ photos, bgmSrc, locale }: { photos: GalleryPhoto[]; bgmS
                 <StoryImageButton
                   photo={photo}
                   onOpen={() => setLightboxIndex(index)}
-                  className="aspect-[4/5] sm:aspect-[16/9]"
+                  className="aspect-[5/4]"
                   sizes="(min-width: 1024px) 960px, 100vw"
                   priority
                   previewLabel={copy.album.previewPhoto(index + 1)}
@@ -376,7 +376,7 @@ function AlbumGallery({ photos, bgmSrc, locale }: { photos: GalleryPhoto[]; bgmS
                 <StoryImageButton
                   photo={photo}
                   onOpen={() => setLightboxIndex(index)}
-                  className="aspect-[5/4] sm:aspect-[16/9]"
+                  className="aspect-[5/4]"
                   sizes="(min-width: 1024px) 960px, 100vw"
                   previewLabel={copy.album.previewPhoto(index + 1)}
                 >
@@ -404,7 +404,7 @@ function AlbumGallery({ photos, bgmSrc, locale }: { photos: GalleryPhoto[]; bgmS
               <StoryImageButton
                 photo={photo}
                 onOpen={() => setLightboxIndex(index)}
-                className={["aspect-[4/5] sm:aspect-[4/3]", isReversed ? "md:col-start-2" : ""].join(" ")}
+                className={["aspect-[5/4]", isReversed ? "md:col-start-2" : ""].join(" ")}
                 sizes="(min-width: 1024px) 600px, 100vw"
                 previewLabel={copy.album.previewPhoto(index + 1)}
               />
@@ -491,10 +491,13 @@ function StoryImageButton({
   priority?: boolean;
   children?: React.ReactNode;
 }) {
+  const [imageAspectRatio, setImageAspectRatio] = useState<string>();
+
   return (
     <button
       type="button"
       onClick={onOpen}
+      style={imageAspectRatio ? { aspectRatio: imageAspectRatio } : undefined}
       className={[
         "group relative block w-full cursor-zoom-in overflow-hidden rounded-lg bg-[#f3ded8] shadow-[0_18px_44px_rgba(138,27,21,0.12)] outline-none transition-transform duration-300 hover:-translate-y-1 focus-visible:ring-3 focus-visible:ring-[#c31b28]/25",
         className,
@@ -505,9 +508,14 @@ function StoryImageButton({
         src={photo.src}
         alt={photo.alt}
         fill
-        className="object-cover transition duration-500 group-hover:scale-[1.03]"
+        className="object-contain"
         sizes={sizes}
         priority={priority}
+        onLoad={({ currentTarget }) => {
+          if (currentTarget.naturalWidth > 0 && currentTarget.naturalHeight > 0) {
+            setImageAspectRatio(`${currentTarget.naturalWidth} / ${currentTarget.naturalHeight}`);
+          }
+        }}
       />
       {children}
     </button>
