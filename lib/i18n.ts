@@ -9,12 +9,12 @@ export const translations = {
   zh: {
     siteTitle: "我们结婚啦",
     routeTitles: {
-      chengdu: "我们结婚啦-成都",
-      bazhong: "我们结婚啦-巴中",
+      chengdu: "我们结婚啦（成都｜9.28）",
+      bazhong: "我们结婚啦（巴中｜10.5）",
     },
     metadata: {
       description: "诚挚邀请您参加我们的婚礼",
-      routeDescription: "诚挚邀请您参加我们的婚礼答谢宴",
+      routeDescription: "何星朋🩷王培琳",
       socialDescription: "何星朋🩷王培琳",
       imageAlt: "婚礼邀请函",
     },
