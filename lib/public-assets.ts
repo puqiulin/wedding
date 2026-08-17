@@ -3,7 +3,13 @@ import { promises as fs } from "fs";
 import path from "path";
 
 const publicRoot = path.join(process.cwd(), "public");
-const allowedFolders = new Set(["album", "cover", "music"]);
+const allowedFolders = new Set(["album", "cover", "music", "open-graph"]);
+
+const allowedAssetPrefixes = ["/album/", "/cover/", "/music/", "/open-graph/"];
+
+function isAllowedPublicAsset(src: string) {
+  return allowedAssetPrefixes.some((prefix) => src.startsWith(prefix));
+}
 
 function normalizeFolder(folder: unknown) {
   if (typeof folder !== "string" || !allowedFolders.has(folder)) {
@@ -49,13 +55,13 @@ export async function savePublicAsset(file: File, folderInput: unknown) {
 }
 
 export async function deletePublicAsset(src: string) {
-  if (!src.startsWith("/album/") && !src.startsWith("/cover/") && !src.startsWith("/music/")) return;
+  if (!isAllowedPublicAsset(src)) return;
 
   await fs.rm(resolvePublicAsset(src), { force: true });
 }
 
 export async function publicAssetExists(src: string) {
-  if (!src.startsWith("/album/") && !src.startsWith("/cover/") && !src.startsWith("/music/")) {
+  if (!isAllowedPublicAsset(src)) {
     return false;
   }
 
@@ -71,7 +77,7 @@ export async function publicAssetExists(src: string) {
 }
 
 export async function readPublicAsset(src: string) {
-  if (!src.startsWith("/album/") && !src.startsWith("/cover/") && !src.startsWith("/music/")) {
+  if (!isAllowedPublicAsset(src)) {
     return null;
   }
 

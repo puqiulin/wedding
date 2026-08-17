@@ -5,12 +5,16 @@ import { Geist } from "next/font/google";
 import { translations } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n-server";
 import { cn } from "@/lib/utils";
+import { DEFAULT_OPEN_GRAPH_IMAGE, getOpenGraphImageSrc } from "@/lib/open-graph-image";
 import { VisitorTracker } from "./visitor-tracker";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export async function generateMetadata(): Promise<Metadata> {
-  const locale = await getRequestLocale();
+  const [locale, openGraphImageSrc] = await Promise.all([
+    getRequestLocale(),
+    getOpenGraphImageSrc(),
+  ]);
   const copy = translations[locale];
   return {
     metadataBase: new URL("https://wedding.sprite3366.cn"),
@@ -22,7 +26,13 @@ export async function generateMetadata(): Promise<Metadata> {
       description: copy.metadata.socialDescription,
       type: "website",
       url: "/",
-      images: [{ url: "/sprite.jpg", width: 1080, height: 714, alt: copy.metadata.imageAlt }],
+      images: [{
+        url: openGraphImageSrc,
+        ...(openGraphImageSrc === DEFAULT_OPEN_GRAPH_IMAGE
+          ? { width: 1080, height: 714 }
+          : {}),
+        alt: copy.metadata.imageAlt,
+      }],
     },
   };
 }

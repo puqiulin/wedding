@@ -12,7 +12,7 @@ declare global {
   var weddingDbSchemaVersion: number | undefined;
 }
 
-const schemaVersion = 4;
+const schemaVersion = 5;
 
 const schemaSql = `
 CREATE TABLE IF NOT EXISTS "photos" (
@@ -35,6 +35,14 @@ CREATE TABLE IF NOT EXISTS "music" (
 );
 
 CREATE TABLE IF NOT EXISTS "cover_images" (
+  "id" serial PRIMARY KEY NOT NULL,
+  "src" text NOT NULL,
+  "file_name" text NOT NULL,
+  "file_size" integer NOT NULL,
+  "created_at" timestamp DEFAULT now() NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS "open_graph_images" (
   "id" serial PRIMARY KEY NOT NULL,
   "src" text NOT NULL,
   "file_name" text NOT NULL,

@@ -41,6 +41,16 @@ export const coverImages = pgTable("cover_images", {
 
 export type CoverImage = typeof coverImages.$inferSelect;
 
+export const openGraphImages = pgTable("open_graph_images", {
+  id: serial("id").primaryKey(),
+  src: text("src").notNull(),
+  fileName: text("file_name").notNull(),
+  fileSize: integer("file_size").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type OpenGraphImage = typeof openGraphImages.$inferSelect;
+
 export const visitorLogs = pgTable("visitor_logs", {
   id: serial("id").primaryKey(),
   ip: text("ip").notNull().default(""),

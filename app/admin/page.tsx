@@ -13,12 +13,12 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  ImagePlus, Music, Trash2, LogOut, RefreshCw, Upload, X,
+  ImagePlus, Music, Trash2, LogOut, RefreshCw, Upload, X, Share2,
   CheckCircle2, AlertCircle, Loader2, Globe2, Flag, Monitor, Smartphone,
   Chrome, Database, CircleUserRound, Eye, Users, ChevronsLeft,
   ChevronLeft, ChevronRight, ChevronsRight, Check, ListChecks,
 } from "lucide-react";
-import type { CoverImage, Photo, Music as MusicType, VisitorLog } from "@/lib/db/schema";
+import type { CoverImage, OpenGraphImage, Photo, Music as MusicType, VisitorLog } from "@/lib/db/schema";
 import { MAX_ALBUM_PHOTOS } from "@/lib/album";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -64,7 +64,7 @@ type UploadedAsset = {
   fileSize: number;
 };
 
-function xhrUpload(file: File, folder: "album" | "cover" | "music", onProgress: (p: number) => void) {
+function xhrUpload(file: File, folder: "album" | "cover" | "music" | "open-graph", onProgress: (p: number) => void) {
   return new Promise<UploadedAsset>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.upload.onprogress = (e) => {
@@ -486,6 +486,7 @@ export default function AdminPage() {
   const [photoDeleteError, setPhotoDeleteError] = useState("");
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
   const [coverImage, setCoverImage] = useState<CoverImage | null>(null);
+  const [openGraphImage, setOpenGraphImage] = useState<OpenGraphImage | null>(null);
   const [musicFile, setMusicFile] = useState<MusicType | null>(null);
   const [visits, setVisits] = useState<VisitorLogRow[]>([]);
   const [visitStats, setVisitStats] = useState<VisitStats>({ totalViews: 0, uniqueVisitors: 0, distinctCountries: 0 });
@@ -493,7 +494,9 @@ export default function AdminPage() {
   const [visitsLoading, setVisitsLoading] = useState(false);
   const [musicProgress, setMusicProgress] = useState<number | null>(null);
   const [coverProgress, setCoverProgress] = useState<number | null>(null);
+  const [openGraphProgress, setOpenGraphProgress] = useState<number | null>(null);
   const [deletingCover, setDeletingCover] = useState(false);
+  const [deletingOpenGraph, setDeletingOpenGraph] = useState(false);
   const [deletingMusic, setDeletingMusic] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -508,6 +511,10 @@ export default function AdminPage() {
 
   const fetchCoverImage = useCallback(async () => {
     setCoverImage(await fetch("/api/cover-image").then((r) => r.json()));
+  }, []);
+
+  const fetchOpenGraphImage = useCallback(async () => {
+    setOpenGraphImage(await fetch("/api/open-graph-image").then((r) => r.json()));
   }, []);
 
   const fetchVisits = useCallback(async (page = 1) => {
@@ -538,6 +545,7 @@ export default function AdminPage() {
 
   useEffect(() => { fetchPhotos(); }, [fetchPhotos]);
   useEffect(() => { fetchCoverImage(); }, [fetchCoverImage]);
+  useEffect(() => { fetchOpenGraphImage(); }, [fetchOpenGraphImage]);
   useEffect(() => { fetchVisits(); }, [fetchVisits]);
   useEffect(() => { fetch("/api/music").then((r) => r.json()).then(setMusicFile); }, []);
 
@@ -616,6 +624,24 @@ export default function AdminPage() {
     e.target.value = "";
   }
 
+  async function handleOpenGraphImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setOpenGraphProgress(0);
+    try {
+      const uploaded = await xhrUpload(file, "open-graph", setOpenGraphProgress);
+      const response = await fetch("/api/open-graph-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(uploaded),
+      });
+      if (!response.ok) throw new Error("Failed to save Open Graph image");
+      setOpenGraphImage(await response.json());
+    } catch { /* noop */ }
+    setOpenGraphProgress(null);
+    e.target.value = "";
+  }
+
   async function deleteCoverImage() {
     setDeletingCover(true);
     try {
@@ -623,6 +649,17 @@ export default function AdminPage() {
       setCoverImage(null);
     } finally {
       setDeletingCover(false);
+    }
+  }
+
+  async function deleteOpenGraphImage() {
+    setDeletingOpenGraph(true);
+    try {
+      const response = await fetch("/api/open-graph-image", { method: "DELETE" });
+      if (!response.ok) throw new Error("Failed to delete Open Graph image");
+      setOpenGraphImage(null);
+    } finally {
+      setDeletingOpenGraph(false);
     }
   }
 
@@ -719,7 +756,7 @@ export default function AdminPage() {
               <Database className="size-3.5" />
               数据库
             </Link>
-            <Button variant="ghost" size="icon-sm" onClick={() => { fetchPhotos(); fetchCoverImage(); fetchVisits(visitPagination.page); }} aria-label="刷新">
+            <Button variant="ghost" size="icon-sm" onClick={() => { fetchPhotos(); fetchCoverImage(); fetchOpenGraphImage(); fetchVisits(visitPagination.page); }} aria-label="刷新">
               <RefreshCw className="size-4" />
             </Button>
             <Button variant="ghost" size="sm" onClick={() => { fetch("/api/auth/logout", { method: "POST" }); router.push("/admin/login"); }}>
@@ -731,7 +768,7 @@ export default function AdminPage() {
 
       <main className="mx-auto max-w-5xl space-y-6 p-4 pt-6">
         {/* Main asset controls */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           {/* Cover image card */}
           <Card className="overflow-hidden">
             <CardContent className="p-4 space-y-3">
@@ -792,6 +829,71 @@ export default function AdminPage() {
                 <div className="space-y-1">
                   <Progress value={coverProgress} className="h-1.5" />
                   <p className="text-right text-xs text-muted-foreground">{coverProgress}%</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Open Graph image card */}
+          <Card className="overflow-hidden">
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Share2 className="size-4 text-muted-foreground" />
+                社交分享图片
+              </div>
+              <div className={cn("flex items-center gap-3 rounded-lg bg-muted/50 p-3", deletingOpenGraph && "pointer-events-none opacity-50")}>
+                <Image
+                  src={openGraphImage?.src ?? "/sprite.jpg"}
+                  alt="当前社交分享图片"
+                  width={112}
+                  height={59}
+                  className="aspect-[1200/630] w-28 shrink-0 rounded-md object-cover"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm">{openGraphImage?.fileName ?? "默认分享图片"}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {openGraphImage ? fmt(openGraphImage.fileSize) : "未单独配置 · 建议 1200 × 630"}
+                  </p>
+                </div>
+                {openGraphImage && (
+                  deletingOpenGraph ? (
+                    <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
+                  ) : (
+                    <AlertDialog>
+                      <AlertDialogTrigger render={<Button variant="ghost" size="icon-sm" aria-label="恢复默认分享图片" />}>
+                        <Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>恢复默认分享图片？</AlertDialogTitle>
+                          <AlertDialogDescription>当前上传的 Open Graph 图片将被删除。</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>取消</AlertDialogCancel>
+                          <AlertDialogAction onClick={deleteOpenGraphImage}>恢复默认</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )
+                )}
+              </div>
+              <label
+                className={cn(
+                  "block w-full cursor-pointer rounded-lg border-2 border-dashed py-10 text-center transition-colors hover:border-primary/40 hover:bg-muted/30",
+                  openGraphProgress !== null && "pointer-events-none opacity-50",
+                )}
+              >
+                <Upload className="mx-auto mb-2 size-8 text-muted-foreground/50" />
+                <p className="text-sm text-muted-foreground">
+                  {openGraphProgress !== null ? "上传中..." : openGraphImage ? "点击替换分享图片" : "点击选择分享图片"}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground/60">支持 JPG、PNG、WebP</p>
+                <input type="file" accept="image/*" onChange={handleOpenGraphImage} className="hidden" disabled={openGraphProgress !== null} />
+              </label>
+              {openGraphProgress !== null && (
+                <div className="space-y-1">
+                  <Progress value={openGraphProgress} className="h-1.5" />
+                  <p className="text-right text-xs text-muted-foreground">{openGraphProgress}%</p>
                 </div>
               )}
             </CardContent>
