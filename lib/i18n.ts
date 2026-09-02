@@ -136,11 +136,14 @@ export const translations = {
 
 const localizedVenues: Record<Locale, Record<VenueSlug, { city: string; address: string }>> = {
   zh: {
-    chengdu: { city: "成都", address: "成都市双流区广都大道480号" },
+    chengdu: { city: "成都", address: "杏花村酒店·宴会厅 四川省成都市双流区东升街道广都大道三段与环港路交叉口东南角" },
     bazhong: { city: "巴中", address: "巴中市巴州区回风北路55号宏鼎国际2号楼" },
   },
   en: {
-    chengdu: { city: "Chengdu", address: "No. 480 Guangdu Avenue, Shuangliu District, Chengdu" },
+    chengdu: {
+      city: "Chengdu",
+      address: "Xinghuacun Hotel · Banquet Hall, southeast corner of the intersection of Section 3, Guangdu Avenue and Huangang Road, Dongsheng Subdistrict, Shuangliu District, Chengdu, Sichuan",
+    },
     bazhong: { city: "Bazhong", address: "Building 2, Hongding International, No. 55 Huifeng North Road, Bazhou District, Bazhong" },
   },
 };

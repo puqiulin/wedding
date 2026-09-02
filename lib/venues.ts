@@ -4,7 +4,7 @@ export const weddingEvents = [
     date: "2026.9.28",
     isoDate: "2026-09-28",
     city: "成都",
-    address: "成都市双流区广都大道480号",
+    address: "杏花村酒店·宴会厅 四川省成都市双流区东升街道广都大道三段与环港路交叉口东南角",
     position: [103.932975, 30.551881] as const,
   },
   {
